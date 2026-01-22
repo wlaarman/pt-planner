@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User/Trainer authentication
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String
+  name         String
+  phone        String?
+  color        String    @default("#4F46E5")
+  hourlyRate   Decimal?  @db.Decimal(10, 2)
+  role         Role      @default(TRAINER)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  appointments    Appointment[]
+  calendarConnections CalendarConnection[]
+  invoicesCreated Invoice[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  TRAINER
+}
+
+// Participants (clients)
+model Participant {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  phone           String?
+  notes           String?
+  preferredType   String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  appointments    AppointmentParticipant[]
+  invoices        Invoice[]
+
+  @@map("participants")
+}
+
+// Training types
+model TrainingType {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  maxParticipants Int       @default(1)
+  defaultDuration Int       @default(60) // in minutes
+  defaultRate     Decimal?  @db.Decimal(10, 2)
+  icon            String    @default("user")
+  color           String    @default("#4F46E5")
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  appointments    Appointment[]
+
+  @@map("training_types")
+}
+
+// Appointments
+model Appointment {
+  id              String    @id @default(cuid())
+  title           String?
+  startTime       DateTime
+  endTime         DateTime
+  notes           String?
+
+  // Recurrence
+  isRecurring     Boolean   @default(false)
+  recurrenceRule  String?   // RRULE format
+  recurrenceId    String?   // Parent appointment ID for recurring series
+
+  // Google Calendar sync
+  googleEventId   String?
+  isSynced        Boolean   @default(false)
+
+  // Status
+  status          AppointmentStatus @default(SCHEDULED)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  trainerId       String
+  trainer         User      @relation(fields: [trainerId], references: [id])
+
+  trainingTypeId  String
+  trainingType    TrainingType @relation(fields: [trainingTypeId], references: [id])
+
+  participants    AppointmentParticipant[]
+  invoiceItems    InvoiceItem[]
+
+  @@index([trainerId])
+  @@index([startTime])
+  @@index([recurrenceId])
+  @@map("appointments")
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// Many-to-many relation between appointments and participants
+model AppointmentParticipant {
+  id              String    @id @default(cuid())
+  appointmentId   String
+  participantId   String
+
+  appointment     Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  participant     Participant  @relation(fields: [participantId], references: [id])
+
+  @@unique([appointmentId, participantId])
+  @@map("appointment_participants")
+}
+
+// Calendar connections (Google, Outlook, etc.)
+model CalendarConnection {
+  id              String    @id @default(cuid())
+  provider        CalendarProvider
+  accessToken     String
+  refreshToken    String?
+  tokenExpiry     DateTime?
+  calendarId      String?
+  isActive        Boolean   @default(true)
+  showExternal    Boolean   @default(true)
+  lastSyncAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, provider])
+  @@map("calendar_connections")
+}
+
+enum CalendarProvider {
+  GOOGLE
+  OUTLOOK
+}
+
+// Invoices
+model Invoice {
+  id              String    @id @default(cuid())
+  invoiceNumber   String    @unique
+
+  // Dates
+  issueDate       DateTime  @default(now())
+  dueDate         DateTime
+  paidAt          DateTime?
+
+  // Amounts
+  subtotal        Decimal   @db.Decimal(10, 2)
+  taxRate         Decimal   @default(21) @db.Decimal(5, 2)
+  taxAmount       Decimal   @db.Decimal(10, 2)
+  discount        Decimal   @default(0) @db.Decimal(10, 2)
+  total           Decimal   @db.Decimal(10, 2)
+
+  // Status
+  status          InvoiceStatus @default(DRAFT)
+
+  // External sync
+  externalId      String?   // Moneybird invoice ID
+  isSynced        Boolean   @default(false)
+
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  participantId   String
+  participant     Participant @relation(fields: [participantId], references: [id])
+
+  createdById     String
+  createdBy       User      @relation(fields: [createdById], references: [id])
+
+  items           InvoiceItem[]
+
+  @@index([participantId])
+  @@index([status])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+// Invoice line items
+model InvoiceItem {
+  id              String    @id @default(cuid())
+  description     String
+  quantity        Decimal   @db.Decimal(10, 2)
+  unitPrice       Decimal   @db.Decimal(10, 2)
+  amount          Decimal   @db.Decimal(10, 2)
+
+  invoiceId       String
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  appointmentId   String?
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@map("invoice_items")
+}

@@ -1,0 +1,59 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: pt_planner_db
+    environment:
+      POSTGRES_USER: ptplanner
+      POSTGRES_PASSWORD: ptplanner_dev
+      POSTGRES_DB: ptplanner
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ptplanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pt_planner_backend
+    environment:
+      DATABASE_URL: postgresql://ptplanner:ptplanner_dev@db:5432/ptplanner
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      NODE_ENV: development
+      PORT: 3001
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pt_planner_frontend
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    command: npm run dev -- --host
+
+volumes:
+  postgres_data:

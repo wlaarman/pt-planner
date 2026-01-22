@@ -1,0 +1,166 @@
+{
+  "name": "PT Planner - Development",
+  "desc": "Personal Trainer Planning Application - Sprint Board",
+  "lists": [
+    {
+      "name": "Backlog (Toekomst)",
+      "cards": [
+        {"name": "B.1 Outlook Calendar integratie", "desc": "Koppeling met Microsoft Outlook Calendar naast Google Calendar", "labels": ["Integration"]},
+        {"name": "B.2 iCal import/export", "desc": "Ondersteuning voor iCal bestanden importeren en exporteren", "labels": ["Integration"]},
+        {"name": "B.3 Trainer beschikbaarheid instellen", "desc": "Trainers kunnen hun beschikbare uren per dag/week instellen", "labels": ["Feature"]},
+        {"name": "B.4 Deelnemer portal", "desc": "Deelnemers krijgen een eigen account om geplande lessen in te zien", "labels": ["Feature", "Auth"]},
+        {"name": "B.5 Email notificaties", "desc": "Automatische emails voor afspraakbevestigingen en herinneringen", "labels": ["Feature"]},
+        {"name": "B.6 Push notificaties (PWA)", "desc": "Browser push notificaties voor nieuwe afspraken", "labels": ["Feature"]},
+        {"name": "B.7 Wachtlijst groepstrainingen", "desc": "Wachtlijst wanneer een groepstraining vol zit", "labels": ["Feature"]},
+        {"name": "B.8 Dashboard met statistieken", "desc": "Overzichtspagina met grafieken en KPIs", "labels": ["Feature"]},
+        {"name": "B.9 Exact Online integratie", "desc": "Koppeling met Exact Online boekhoudpakket", "labels": ["Integration"]},
+        {"name": "B.10 Native mobile app", "desc": "React Native app voor iOS en Android", "labels": ["Mobile"]}
+      ]
+    },
+    {
+      "name": "Sprint 1: Foundation",
+      "cards": [
+        {"name": "1.1 Project initialisatie (Vite + React + TypeScript)", "desc": "Setup van het frontend project met Vite, React 18 en TypeScript configuratie", "labels": ["Setup"], "checklist": ["npm create vite@latest", "TypeScript configuratie", "ESLint + Prettier setup", "Folder structuur aanmaken"]},
+        {"name": "1.2 Tailwind CSS configuratie", "desc": "Installatie en configuratie van Tailwind CSS met custom theme", "labels": ["Setup"], "checklist": ["Install tailwindcss", "Configure tailwind.config.js", "Add custom colors", "Setup base styles"]},
+        {"name": "1.3 Database schema ontwerp", "desc": "Ontwerp van het volledige database schema voor alle entiteiten", "labels": ["Backend", "Database"], "checklist": ["Users/Trainers tabel", "Participants tabel", "TrainingTypes tabel", "Appointments tabel", "Invoices tabel", "CalendarConnections tabel"]},
+        {"name": "1.4 Prisma ORM setup en migraties", "desc": "Prisma installatie, schema definitie en eerste migratie", "labels": ["Backend", "Database"], "checklist": ["Install Prisma", "Define schema.prisma", "Run initial migration", "Generate Prisma client"]},
+        {"name": "1.5 Express.js API server setup", "desc": "Backend server met Express.js, TypeScript en basis middleware", "labels": ["Backend"], "checklist": ["Express + TypeScript setup", "CORS configuratie", "Error handling middleware", "Request logging", "Environment variables"]},
+        {"name": "1.6 Authenticatie systeem (JWT)", "desc": "JWT-based authenticatie met login/logout functionaliteit", "labels": ["Backend", "Auth"], "checklist": ["JWT token generation", "Password hashing (bcrypt)", "Login endpoint", "Token verification middleware", "Refresh token mechanisme"]},
+        {"name": "1.7 Login pagina UI", "desc": "Login formulier met email/wachtwoord", "labels": ["Frontend", "Auth"], "checklist": ["Login form component", "Form validatie", "Error messages", "Loading state", "Redirect na login"]},
+        {"name": "1.8 Protected routes implementatie", "desc": "Route guards voor authenticated pages", "labels": ["Frontend", "Auth"], "checklist": ["Auth context/provider", "ProtectedRoute component", "Token storage", "Auto-logout bij expired token"]},
+        {"name": "1.9 Basis layout (sidebar, header)", "desc": "Applicatie layout met navigatie sidebar en header", "labels": ["Frontend"], "checklist": ["Sidebar component", "Navigation menu", "Active state styling", "User info in footer", "Responsive collapse"]},
+        {"name": "1.10 API client setup", "desc": "Axios of Fetch wrapper met auth headers en error handling", "labels": ["Frontend"], "checklist": ["API client instantie", "Auth header interceptor", "Error handling", "Response typing"]}
+      ]
+    },
+    {
+      "name": "Sprint 2: Core Entities",
+      "cards": [
+        {"name": "2.1 Trainers API endpoints (CRUD)", "desc": "REST endpoints voor trainers beheer", "labels": ["Backend"], "checklist": ["GET /trainers", "GET /trainers/:id", "POST /trainers", "PUT /trainers/:id", "DELETE /trainers/:id"]},
+        {"name": "2.2 Trainers overzichtspagina", "desc": "Pagina met overzicht van alle trainers als cards", "labels": ["Frontend"], "checklist": ["TrainersPage component", "TrainerCard component", "Fetch trainers", "Loading state", "Empty state"]},
+        {"name": "2.3 Trainer formulier (create/edit)", "desc": "Modal met formulier voor trainer aanmaken/bewerken", "labels": ["Frontend"], "checklist": ["TrainerForm component", "Naam, email, telefoon velden", "Tarief input", "Create mode", "Edit mode"]},
+        {"name": "2.4 Trainer kleur kiezer component", "desc": "Color picker voor agenda kleur van trainer", "labels": ["Frontend"], "checklist": ["ColorPicker component", "Preset kleuren", "Preview", "Save to trainer"]},
+        {"name": "2.5 Deelnemers API endpoints (CRUD)", "desc": "REST endpoints voor deelnemers beheer", "labels": ["Backend"], "checklist": ["GET /participants", "GET /participants/:id", "POST /participants", "PUT /participants/:id", "DELETE /participants/:id", "GET /participants/search"]},
+        {"name": "2.6 Deelnemers overzichtspagina met tabel", "desc": "Tabelweergave van alle deelnemers", "labels": ["Frontend"], "checklist": ["ParticipantsPage component", "Data table component", "Sorteerbare kolommen", "Pagination"]},
+        {"name": "2.7 Deelnemer formulier (create/edit)", "desc": "Modal met formulier voor deelnemer aanmaken/bewerken", "labels": ["Frontend"], "checklist": ["ParticipantForm component", "Contactgegevens velden", "Voorkeur trainingstype", "Notities veld"]},
+        {"name": "2.8 Zoekfunctie voor deelnemers", "desc": "Zoekbalk met live filtering", "labels": ["Frontend"], "checklist": ["SearchInput component", "Debounced search", "Filter results", "Clear button"]},
+        {"name": "2.9 Trainingstypes API endpoints (CRUD)", "desc": "REST endpoints voor trainingstypes", "labels": ["Backend"], "checklist": ["GET /training-types", "POST /training-types", "PUT /training-types/:id", "DELETE /training-types/:id"]},
+        {"name": "2.10 Trainingstypes overzichtspagina", "desc": "Cards met overzicht van trainingstypes", "labels": ["Frontend"], "checklist": ["TrainingTypesPage component", "TypeCard component", "Icon per type", "Details weergave"]},
+        {"name": "2.11 Trainingstype formulier met tarief", "desc": "Formulier voor type met max deelnemers en tarief", "labels": ["Frontend"], "checklist": ["TrainingTypeForm component", "Naam en beschrijving", "Max deelnemers input", "Standaard duur", "Tarief configuratie"]}
+      ]
+    },
+    {
+      "name": "Sprint 3: Calendar View",
+      "cards": [
+        {"name": "3.1 Calendar component basis (week view)", "desc": "Week kalender weergave met tijdslots", "labels": ["Frontend"], "checklist": ["WeekCalendar component", "Time column (6:00-21:00)", "Day columns", "Grid layout", "Responsive design"]},
+        {"name": "3.2 Dag weergave implementatie", "desc": "Enkele dag weergave van de kalender", "labels": ["Frontend"], "checklist": ["DayCalendar component", "Full day timeline", "Meer ruimte voor events"]},
+        {"name": "3.3 Maand weergave implementatie", "desc": "Maandoverzicht met event counts", "labels": ["Frontend"], "checklist": ["MonthCalendar component", "Day cells", "Event dots/count", "Click to day view"]},
+        {"name": "3.4 Calendar navigatie", "desc": "Knoppen voor vorige/volgende periode", "labels": ["Frontend"], "checklist": ["Navigation buttons", "Period label", "Keyboard shortcuts", "URL state sync"]},
+        {"name": "3.5 Vandaag knop en highlighting", "desc": "Snelle navigatie naar vandaag met visuele highlight", "labels": ["Frontend"], "checklist": ["Today button", "Highlight today column", "Scroll to current time"]},
+        {"name": "3.6 Tijdslots per kwartier rendering", "desc": "15-minuten intervallen in de kalender", "labels": ["Frontend"], "checklist": ["Quarter hour grid lines", "Snap to quarter hour", "Time labels"]},
+        {"name": "3.7 Current time indicator", "desc": "Rode lijn die huidige tijd aangeeft", "labels": ["Frontend"], "checklist": ["Time indicator line", "Auto-update elke minuut", "Time label"]},
+        {"name": "3.8 Event blokken weergave met kleuren", "desc": "Afspraken als gekleurde blokken op basis van trainer", "labels": ["Frontend"], "checklist": ["EventBlock component", "Trainer kleur", "Type indicator", "Hover state", "Event details tooltip"]},
+        {"name": "3.9 Trainer filter checkboxes", "desc": "Filter om trainers te tonen/verbergen", "labels": ["Frontend"], "checklist": ["TrainerFilter component", "Checkbox per trainer", "Kleur indicator", "Filter state management"]},
+        {"name": "3.10 Legend component", "desc": "Legenda voor trainers en types", "labels": ["Frontend"], "checklist": ["Legend component", "Trainer kleuren", "Type indicators"]}
+      ]
+    },
+    {
+      "name": "Sprint 4: Google Integration",
+      "cards": [
+        {"name": "4.1 Google Cloud Project setup", "desc": "Aanmaken Google Cloud project en credentials", "labels": ["Setup", "Integration"], "checklist": ["Create GCP project", "Enable Calendar API", "Create OAuth credentials", "Configure consent screen"]},
+        {"name": "4.2 OAuth 2.0 implementatie backend", "desc": "Google OAuth flow voor calendar toegang", "labels": ["Backend", "Auth"], "checklist": ["OAuth redirect endpoint", "Token exchange", "Store refresh token", "Token refresh logic"]},
+        {"name": "4.3 Google Calendar API service", "desc": "Service class voor Calendar API calls", "labels": ["Backend", "Integration"], "checklist": ["GoogleCalendarService class", "List calendars", "Get events", "Create event", "Update event", "Delete event"]},
+        {"name": "4.4 Fetch events from Google Calendar", "desc": "Ophalen van events en tonen in app", "labels": ["Backend"], "checklist": ["Endpoint voor fetch events", "Date range filtering", "Transform to app format", "Cache events"]},
+        {"name": "4.5 Create/Update events in Google Calendar", "desc": "Synchroniseren van app afspraken naar Google", "labels": ["Backend"], "checklist": ["Create event in Google", "Update existing event", "Store Google event ID", "Handle conflicts"]},
+        {"name": "4.6 Calendar connectie UI in instellingen", "desc": "Instellingenpagina voor Google koppeling", "labels": ["Frontend"], "checklist": ["Settings page section", "Connect button", "OAuth popup flow", "Connection status"]},
+        {"name": "4.7 Sync status indicator", "desc": "Visuele indicator van sync status", "labels": ["Frontend"], "checklist": ["Sync status badge", "Last synced time", "Sync in progress spinner"]},
+        {"name": "4.8 Toggle om Google events te tonen/verbergen", "desc": "Schakelaar om externe events te filteren", "labels": ["Frontend"], "checklist": ["Toggle switch", "Filter calendar events", "Visual distinction"]},
+        {"name": "4.9 Activeren/deactiveren sync", "desc": "Mogelijkheid om sync aan/uit te zetten", "labels": ["Frontend"], "checklist": ["Enable/disable toggle", "Disconnect option", "Confirmation dialog"]},
+        {"name": "4.10 Conflict detectie", "desc": "Waarschuwing bij overlappende afspraken", "labels": ["Backend"], "checklist": ["Check for overlaps", "Warning in UI", "Allow override"]}
+      ]
+    },
+    {
+      "name": "Sprint 5: Appointments",
+      "cards": [
+        {"name": "5.1 Appointments API endpoints (CRUD)", "desc": "REST endpoints voor afspraken", "labels": ["Backend"], "checklist": ["GET /appointments", "GET /appointments/:id", "POST /appointments", "PUT /appointments/:id", "DELETE /appointments/:id"]},
+        {"name": "5.2 Appointment model met relaties", "desc": "Database model met trainer/deelnemer links", "labels": ["Backend", "Database"], "checklist": ["Appointment schema", "Trainer relation", "Participants relation (many-to-many)", "TrainingType relation", "Recurrence fields"]},
+        {"name": "5.3 Afspraak aanmaken modal", "desc": "Modal formulier voor nieuwe afspraak", "labels": ["Frontend"], "checklist": ["AppointmentModal component", "Form layout", "Validation", "Submit handling"]},
+        {"name": "5.4 Trainer selectie in formulier", "desc": "Dropdown om trainer te kiezen", "labels": ["Frontend"], "checklist": ["Trainer dropdown", "Show trainer color", "Required field"]},
+        {"name": "5.5 Deelnemer(s) selectie", "desc": "Multi-select voor meerdere deelnemers", "labels": ["Frontend"], "checklist": ["Multi-select component", "Search in list", "Max based on type", "Selected chips"]},
+        {"name": "5.6 Trainingstype selectie", "desc": "Radio buttons of cards voor type", "labels": ["Frontend"], "checklist": ["Type selector cards", "Icon per type", "Update participant limit"]},
+        {"name": "5.7 Tijdselectie per kwartier", "desc": "Start/eind tijd in 15 min intervallen", "labels": ["Frontend"], "checklist": ["Time dropdown", "Quarter hour options", "Duration calculation"]},
+        {"name": "5.8 Herhaling opties UI", "desc": "Selectie voor herhalingspatroon", "labels": ["Frontend", "Backend"], "checklist": ["Recurrence dropdown", "Day selector for weekly", "Conditional display"]},
+        {"name": "5.9 Herhalende afspraken zonder einddatum", "desc": "Oneindige herhaling ondersteuning", "labels": ["Backend"], "checklist": ["Recurrence pattern storage", "Generate occurrences", "No end date option"]},
+        {"name": "5.10 Afspraak detail modal", "desc": "Modal met volledige afspraak info", "labels": ["Frontend"], "checklist": ["Detail modal", "All appointment info", "Edit/Delete buttons"]},
+        {"name": "5.11 Afspraak bewerken", "desc": "Bewerk bestaande afspraak", "labels": ["Frontend"], "checklist": ["Edit mode in modal", "Pre-fill form", "Update API call"]},
+        {"name": "5.12 Afspraak verwijderen", "desc": "Verwijder enkele of hele serie", "labels": ["Frontend", "Backend"], "checklist": ["Delete confirmation", "Single occurrence delete", "Delete series option", "Update Google Calendar"]},
+        {"name": "5.13 Drag & drop verplaatsen", "desc": "Sleep afspraak naar andere tijd/dag", "labels": ["Frontend"], "checklist": ["Draggable events", "Drop zones", "Update on drop", "Optimistic update"]},
+        {"name": "5.14 Klik op slot om afspraak te maken", "desc": "Klik op lege plek opent modal", "labels": ["Frontend"], "checklist": ["Click handler on grid", "Pre-fill time from click", "Open modal"]},
+        {"name": "5.15 Resize afspraak", "desc": "Sleep onderkant om duur aan te passen", "labels": ["Frontend"], "checklist": ["Resize handle", "Update duration", "Snap to quarter hour"]},
+        {"name": "5.16 Sync naar Google Calendar", "desc": "Automatisch syncen van nieuwe afspraken", "labels": ["Backend", "Integration"], "checklist": ["On create sync", "On update sync", "On delete sync", "Handle errors"]}
+      ]
+    },
+    {
+      "name": "Sprint 6: Reports & Invoices",
+      "cards": [
+        {"name": "6.1 Reports API endpoint", "desc": "Endpoint voor rapport data", "labels": ["Backend"], "checklist": ["GET /reports", "Aggregation queries", "Grouping options"]},
+        {"name": "6.2 Filter op deelnemer, periode, trainer", "desc": "Query parameters voor filtering", "labels": ["Backend"], "checklist": ["participantId filter", "startDate/endDate filter", "trainerId filter", "Combine filters"]},
+        {"name": "6.3 Rapport pagina UI met filters", "desc": "Rapportage pagina met filter formulier", "labels": ["Frontend"], "checklist": ["ReportsPage component", "Filter form", "Submit button", "Clear filters"]},
+        {"name": "6.4 Rapport samenvatting", "desc": "Summary cards met totalen", "labels": ["Frontend"], "checklist": ["SummaryCards component", "Total sessions", "Total hours", "Total costs"]},
+        {"name": "6.5 Rapport tabel met selectie", "desc": "Tabel met checkboxes per rij", "labels": ["Frontend"], "checklist": ["Selectable table", "Select all", "Row selection state", "Selected count"]},
+        {"name": "6.6 Export naar PDF", "desc": "Genereer PDF rapport", "labels": ["Backend"], "checklist": ["PDF generation library", "Template design", "Download endpoint"]},
+        {"name": "6.7 Invoices API endpoints (CRUD)", "desc": "REST endpoints voor facturen", "labels": ["Backend"], "checklist": ["GET /invoices", "GET /invoices/:id", "POST /invoices", "PUT /invoices/:id"]},
+        {"name": "6.8 Invoice model met regels", "desc": "Factuur met line items", "labels": ["Backend", "Database"], "checklist": ["Invoice schema", "InvoiceItem schema", "Participant relation", "Status enum"]},
+        {"name": "6.9 Factuur aanmaken vanuit rapport", "desc": "Maak factuur van geselecteerde items", "labels": ["Frontend"], "checklist": ["Create invoice button", "Pass selected items", "Open invoice modal"]},
+        {"name": "6.10 Factuur preview modal", "desc": "Preview van factuur voor verzending", "labels": ["Frontend"], "checklist": ["InvoiceModal component", "Preview layout", "Line items", "Totals"]},
+        {"name": "6.11 Bedragen aanpassen", "desc": "Override bedragen voor verzending", "labels": ["Frontend"], "checklist": ["Editable amounts", "Recalculate total", "Original vs adjusted"]},
+        {"name": "6.12 Korting toevoegen", "desc": "Optionele korting op factuur", "labels": ["Frontend"], "checklist": ["Discount input", "Percentage or fixed", "Apply to total"]},
+        {"name": "6.13 Facturatie overzichtspagina", "desc": "Lijst van alle facturen", "labels": ["Frontend"], "checklist": ["InvoicesPage component", "Invoice table", "Status badges", "Quick actions"]},
+        {"name": "6.14 Factuur status badges", "desc": "Visuele status indicatoren", "labels": ["Frontend"], "checklist": ["Status badge component", "Open style", "Paid style", "Overdue style"]},
+        {"name": "6.15 Markeer als betaald", "desc": "Status wijzigen naar betaald", "labels": ["Frontend"], "checklist": ["Mark paid button", "Confirmation", "Update API"]},
+        {"name": "6.16 Boekhoudkoppeling setup", "desc": "Moneybird API integratie", "labels": ["Backend", "Integration"], "checklist": ["Moneybird API credentials", "OAuth flow", "API client"]},
+        {"name": "6.17 Factuur sync naar boekhouding", "desc": "Push factuur naar Moneybird", "labels": ["Backend", "Integration"], "checklist": ["Transform to Moneybird format", "Create contact if needed", "Create invoice", "Store external ID"]}
+      ]
+    },
+    {
+      "name": "Sprint 7: Polish & Deploy",
+      "cards": [
+        {"name": "7.1 Trainer accounts", "desc": "Aparte login per trainer", "labels": ["Backend", "Auth"], "checklist": ["Trainer user creation", "Login per trainer", "Password reset"]},
+        {"name": "7.2 Role-based access", "desc": "Trainers zien eigen + anderen", "labels": ["Backend", "Auth"], "checklist": ["Define roles", "Permission checks", "Filter by role"]},
+        {"name": "7.3 Error handling en feedback", "desc": "Toast notificaties en error states", "labels": ["Frontend"], "checklist": ["Toast component", "Error boundaries", "API error handling"]},
+        {"name": "7.4 Loading states en skeletons", "desc": "Skeleton loaders tijdens data fetch", "labels": ["Frontend"], "checklist": ["Skeleton components", "Loading indicators", "Suspense boundaries"]},
+        {"name": "7.5 Form validatie", "desc": "Volledige client-side validatie", "labels": ["Frontend"], "checklist": ["Zod schemas", "Field errors", "Submit validation"]},
+        {"name": "7.6 Responsive design check", "desc": "Test en fix responsive issues", "labels": ["Frontend"], "checklist": ["Mobile testing", "Tablet testing", "Fix breakpoint issues"]},
+        {"name": "7.7 PWA setup", "desc": "Progressive Web App configuratie", "labels": ["Frontend", "Setup"], "checklist": ["Web manifest", "Service worker", "Offline support", "Install prompt"]},
+        {"name": "7.8 Mobile optimalisaties", "desc": "Touch-friendly UI aanpassingen", "labels": ["Frontend"], "checklist": ["Touch targets", "Swipe gestures", "Mobile calendar view"]},
+        {"name": "7.9 E2E tests", "desc": "End-to-end tests voor kritieke flows", "labels": ["Testing"], "checklist": ["Setup Playwright", "Login flow test", "Create appointment test", "Create invoice test"]},
+        {"name": "7.10 Unit tests kritieke functies", "desc": "Unit tests voor business logic", "labels": ["Testing"], "checklist": ["Test setup", "API tests", "Utility tests"]},
+        {"name": "7.11 CI/CD pipeline", "desc": "Automated build en deploy", "labels": ["DevOps"], "checklist": ["GitHub Actions workflow", "Run tests", "Build step", "Deploy step"]},
+        {"name": "7.12 Productie deployment", "desc": "Deploy naar productie omgeving", "labels": ["DevOps"], "checklist": ["Choose hosting", "Configure environment", "Deploy frontend", "Deploy backend"]},
+        {"name": "7.13 Database hosting setup", "desc": "Productie database configuratie", "labels": ["DevOps"], "checklist": ["Choose database host", "Create database", "Configure connection", "Run migrations"]},
+        {"name": "7.14 Environment configuratie", "desc": "Environment variables voor prod", "labels": ["DevOps"], "checklist": ["Define env vars", "Secrets management", "Configure per environment"]},
+        {"name": "7.15 Documentatie", "desc": "README en setup instructies", "labels": ["Docs"], "checklist": ["README.md", "Setup instructions", "API documentation"]}
+      ]
+    },
+    {
+      "name": "In Progress",
+      "cards": []
+    },
+    {
+      "name": "Done",
+      "cards": []
+    }
+  ],
+  "labels": [
+    {"name": "Frontend", "color": "blue"},
+    {"name": "Backend", "color": "green"},
+    {"name": "Database", "color": "orange"},
+    {"name": "Auth", "color": "red"},
+    {"name": "Integration", "color": "purple"},
+    {"name": "Setup", "color": "black"},
+    {"name": "Testing", "color": "yellow"},
+    {"name": "DevOps", "color": "sky"},
+    {"name": "Docs", "color": "pink"},
+    {"name": "Feature", "color": "lime"},
+    {"name": "Mobile", "color": "blue"}
+  ]
+}
