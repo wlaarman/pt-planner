@@ -19,6 +19,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const { params } = req.query;
+    const action = Array.isArray(params) ? params[0] : params;
+
+    // /reports/participants - get participants list for reports
+    if (action === 'participants') {
+      const participants = await prisma.participant.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          _count: {
+            select: { appointments: true },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      return res.json(participants);
+    }
+
+    // /reports - get report data
     const { participantId, trainerId, startDate, endDate } = req.query;
 
     const where: Record<string, unknown> = {

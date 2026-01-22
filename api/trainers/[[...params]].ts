@@ -25,12 +25,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return unauthorized(res);
   }
 
-  const { id } = req.query;
-  if (typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid id' });
-  }
-
   try {
+    const { params } = req.query;
+    const id = Array.isArray(params) ? params[0] : params;
+
+    // Routes without ID: GET all, POST create
+    if (!id) {
+      if (req.method === 'GET') {
+        const trainers = await prisma.user.findMany({
+          where: { isActive: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            color: true,
+            hourlyRate: true,
+            role: true,
+            _count: {
+              select: {
+                appointments: {
+                  where: {
+                    startTime: {
+                      gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { name: 'asc' },
+        });
+
+        return res.json(trainers);
+      }
+
+      if (req.method === 'POST') {
+        const data = trainerSchema.parse(req.body);
+
+        const existing = await prisma.user.findUnique({
+          where: { email: data.email },
+        });
+
+        if (existing) {
+          return res.status(400).json({ error: 'Email already in use' });
+        }
+
+        const password = data.password || Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const trainer = await prisma.user.create({
+          data: {
+            email: data.email,
+            password: hashedPassword,
+            name: data.name,
+            phone: data.phone,
+            color: data.color || '#4F46E5',
+            hourlyRate: data.hourlyRate,
+            role: 'TRAINER',
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            color: true,
+            hourlyRate: true,
+            role: true,
+          },
+        });
+
+        return res.status(201).json(trainer);
+      }
+
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    // Routes with ID: GET one, PUT update, DELETE
     if (req.method === 'GET') {
       const trainer = await prisma.user.findUnique({
         where: { id },
@@ -101,7 +172,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
-    console.error('Trainer error:', error);
+    console.error('Trainers error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

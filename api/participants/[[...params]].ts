@@ -23,12 +23,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return unauthorized(res);
   }
 
-  const { id } = req.query;
-  if (typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid id' });
-  }
-
   try {
+    const { params } = req.query;
+    const id = Array.isArray(params) ? params[0] : params;
+
+    // Routes without ID: GET all, POST create
+    if (!id) {
+      if (req.method === 'GET') {
+        const { search } = req.query;
+
+        const where: Record<string, unknown> = { isActive: true };
+
+        if (search && typeof search === 'string') {
+          where.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ];
+        }
+
+        const participants = await prisma.participant.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            notes: true,
+            preferredType: true,
+            _count: {
+              select: {
+                appointments: {
+                  where: {
+                    appointment: {
+                      startTime: {
+                        gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { name: 'asc' },
+        });
+
+        return res.json(participants);
+      }
+
+      if (req.method === 'POST') {
+        const data = participantSchema.parse(req.body);
+
+        const existing = await prisma.participant.findUnique({
+          where: { email: data.email },
+        });
+
+        if (existing) {
+          return res.status(400).json({ error: 'Email already in use' });
+        }
+
+        const participant = await prisma.participant.create({
+          data,
+        });
+
+        return res.status(201).json(participant);
+      }
+
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    // Routes with ID: GET one, PUT update, DELETE
     if (req.method === 'GET') {
       const participant = await prisma.participant.findUnique({
         where: { id },
@@ -95,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
-    console.error('Participant error:', error);
+    console.error('Participants error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

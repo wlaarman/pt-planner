@@ -25,12 +25,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return unauthorized(res);
   }
 
-  const { id } = req.query;
-  if (typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid id' });
-  }
-
   try {
+    const { params } = req.query;
+    const id = Array.isArray(params) ? params[0] : params;
+
+    // Routes without ID: GET all, POST create
+    if (!id) {
+      if (req.method === 'GET') {
+        const types = await prisma.trainingType.findMany({
+          where: { isActive: true },
+          orderBy: { maxParticipants: 'asc' },
+        });
+
+        return res.json(types);
+      }
+
+      if (req.method === 'POST') {
+        const data = trainingTypeSchema.parse(req.body);
+
+        const type = await prisma.trainingType.create({
+          data,
+        });
+
+        return res.status(201).json(type);
+      }
+
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    // Routes with ID: GET one, PUT update, DELETE
     if (req.method === 'GET') {
       const type = await prisma.trainingType.findUnique({
         where: { id },
@@ -68,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
-    console.error('Training type error:', error);
+    console.error('Training types error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
