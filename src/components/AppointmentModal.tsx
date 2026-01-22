@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { format, addHours } from 'date-fns';
+import { format } from 'date-fns';
 import { X, User, Users, Loader2 } from 'lucide-react';
 import { appointmentsApi, trainersApi, participantsApi, trainingTypesApi } from '../lib/api';
 import clsx from 'clsx';
@@ -10,7 +10,6 @@ interface AppointmentModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialData?: { date?: Date; startTime?: string } | null;
-  editAppointment?: any;
 }
 
 const TIME_OPTIONS = Array.from({ length: 60 }, (_, i) => {
@@ -24,7 +23,6 @@ export default function AppointmentModal({
   onClose,
   onSuccess,
   initialData,
-  editAppointment,
 }: AppointmentModalProps) {
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedTrainer, setSelectedTrainer] = useState<string>('');

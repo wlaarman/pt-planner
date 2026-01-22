@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { X, User, Calendar, Clock, Euro, Repeat, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { X, User, Calendar, Euro, Repeat, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { appointmentsApi } from '../lib/api';
 
 interface Appointment {
