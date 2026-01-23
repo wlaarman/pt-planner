@@ -167,6 +167,25 @@ export const reportsApi = {
   },
 };
 
+// Calendar API (iCal integration)
+export const calendarApi = {
+  getSettings: async () => {
+    const { data } = await api.get('/calendar/ical');
+    return data;
+  },
+  updateSettings: async (settings: { icalUrl?: string | null; showIcalEvents?: boolean }) => {
+    const { data } = await api.put('/calendar/ical', settings);
+    return data;
+  },
+  getEvents: async (start: string, end: string) => {
+    const { data } = await api.get('/calendar/ical', { params: { start, end } });
+    return data;
+  },
+  disconnect: async () => {
+    await api.delete('/calendar/ical');
+  },
+};
+
 // Invoices API
 export const invoicesApi = {
   getAll: async (status?: string, participantId?: string) => {

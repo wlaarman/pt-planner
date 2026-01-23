@@ -20,7 +20,7 @@ import {
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
-import { appointmentsApi, trainersApi } from '../lib/api';
+import { appointmentsApi, trainersApi, calendarApi } from '../lib/api';
 import clsx from 'clsx';
 import AppointmentModal from '../components/AppointmentModal';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
@@ -48,6 +48,14 @@ interface Appointment {
   trainer: { id: string; name: string; color: string };
   trainingType: { id: string; name: string; icon: string; color: string };
   participants: { id: string; name: string; email: string }[];
+}
+
+interface ICalEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  isExternal: true;
 }
 
 // Draggable Appointment Component
@@ -138,6 +146,36 @@ function DroppableTimeSlot({
   );
 }
 
+// External iCal Event Component (non-draggable)
+function ExternalEvent({
+  event,
+  style,
+}: {
+  event: ICalEvent;
+  style: React.CSSProperties;
+}) {
+  return (
+    <div
+      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5 opacity-70"
+      style={{
+        ...style,
+        backgroundColor: '#f3f4f6',
+        borderLeftColor: '#9ca3af',
+      }}
+    >
+      <div className="text-xs font-semibold text-gray-500 truncate">
+        {format(new Date(event.startTime), 'HH:mm')} - {format(new Date(event.endTime), 'HH:mm')}
+      </div>
+      <div className="text-xs font-medium text-gray-700 truncate">
+        {event.title}
+      </div>
+      <div className="text-xs text-gray-400 truncate">
+        Externe kalender
+      </div>
+    </div>
+  );
+}
+
 // Drag Overlay Preview
 function AppointmentDragPreview({ apt }: { apt: Appointment }) {
   return (
@@ -209,6 +247,12 @@ export default function CalendarPage() {
     queryKey: ['appointments', weekStart.toISOString(), weekEnd.toISOString()],
     queryFn: () =>
       appointmentsApi.getAll(weekStart.toISOString(), weekEnd.toISOString()),
+  });
+
+  // Fetch external iCal events
+  const { data: icalEvents = [] } = useQuery<ICalEvent[]>({
+    queryKey: ['ical-events', weekStart.toISOString(), weekEnd.toISOString()],
+    queryFn: () => calendarApi.getEvents(weekStart.toISOString(), weekEnd.toISOString()),
   });
 
   // Mutation for updating appointment time via drag & drop
@@ -293,7 +337,7 @@ export default function CalendarPage() {
     );
   };
 
-  const getAppointmentStyle = (apt: Appointment) => {
+  const getAppointmentStyle = (apt: Appointment | ICalEvent) => {
     const start = new Date(apt.startTime);
     const end = new Date(apt.endTime);
     const startHour = start.getHours() + start.getMinutes() / 60;
@@ -605,6 +649,17 @@ export default function CalendarPage() {
                             apt={apt}
                             style={getAppointmentStyle(apt)}
                             onClick={() => handleAppointmentClick(apt)}
+                          />
+                        ))}
+
+                      {/* External iCal Events */}
+                      {icalEvents
+                        .filter((event) => isSameDay(new Date(event.startTime), day))
+                        .map((event) => (
+                          <ExternalEvent
+                            key={event.id}
+                            event={event}
+                            style={getAppointmentStyle(event)}
                           />
                         ))}
                     </div>

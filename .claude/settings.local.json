@@ -32,7 +32,17 @@
       "Bash(npx vercel:*)",
       "Bash(npx prisma db push:*)",
       "Bash(find:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nRename api/_lib to api/lib for Vercel compatibility\n\nVercel ignores files/folders starting with underscore in serverless functions.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nRename api/_lib to api/lib for Vercel compatibility\n\nVercel ignores files/folders starting with underscore in serverless functions.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd includeFiles config for api/lib in Vercel\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run db:seed:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.dndkit.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:github.com)",
+      "Bash(xargs ls:*)"
     ]
   }
 }

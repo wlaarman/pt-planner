@@ -19,6 +19,8 @@ model User {
   hourlyRate   Decimal?  @db.Decimal(10, 2)
   role         Role      @default(TRAINER)
   isActive     Boolean   @default(true)
+  icalUrl      String?   // External calendar iCal URL
+  showIcalEvents Boolean @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
