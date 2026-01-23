@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { prisma } from '../_lib/prisma';
-import { authenticate, unauthorized, setCorsHeaders } from '../_lib/auth';
+import { prisma } from '../lib/prisma';
+import { authenticate, unauthorized, setCorsHeaders } from '../lib/auth';
 
 const invoiceItemSchema = z.object({
   description: z.string(),

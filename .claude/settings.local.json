@@ -17,7 +17,22 @@
       "Bash(gh auth:*)",
       "Bash(git --version:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: PT Planner for Vercel deployment\n\n- React frontend with Vite, Tailwind CSS\n- Vercel serverless API functions\n- Prisma ORM with Neon PostgreSQL support\n- JWT authentication\n- Full CRUD for trainers, participants, training types\n- Appointments management with calendar\n- Reports and invoicing system\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git remote add:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix TypeScript build errors for Vercel deployment\n\n- Remove unused imports \\(Clock, addHours\\)\n- Remove unused editAppointment prop\n- Add vite-env.d.ts for import.meta.env types\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nConsolidate API routes for Vercel Hobby plan \\(12 function limit\\)\n\nReduced from 19 serverless functions to 8 by combining routes:\n- auth/[...path].ts: login, register, me\n- trainers/[[...params]].ts: list, create, get, update, delete\n- participants/[[...params]].ts: list, create, get, update, delete\n- training-types/[[...params]].ts: list, create, get, update, delete\n- appointments/[[...params]].ts: list, create, get, update, delete, status\n- reports/[[...params]].ts: get report, get participants\n- invoices/[[...params]].ts: list, create, get, delete, stats, status\n- health.ts: health check\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npx vercel env pull .env.local)",
+      "Bash(npx vercel login)",
+      "Bash(npx vercel:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(find:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nRename api/_lib to api/lib for Vercel compatibility\n\nVercel ignores files/folders starting with underscore in serverless functions.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

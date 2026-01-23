@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma } from '../_lib/prisma';
-import { authenticate, unauthorized, setCorsHeaders } from '../_lib/auth';
+import { prisma } from '../lib/prisma';
+import { authenticate, unauthorized, setCorsHeaders } from '../lib/auth';
 
 const trainerSchema = z.object({
   email: z.string().email(),
