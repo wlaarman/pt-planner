@@ -52,7 +52,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const params = req.query['...params'];
-    const action = Array.isArray(params) ? params[0] : params;
+    const rawAction = Array.isArray(params) ? params[0] : params;
+    const action = rawAction === '_' ? undefined : rawAction; // '_' is rewrite placeholder for base route
 
     // /reports/participants - get participants list for reports
     if (action === 'participants') {

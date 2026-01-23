@@ -59,7 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const params = req.query['...params'];
-    const id = Array.isArray(params) ? params[0] : params;
+    const rawId = Array.isArray(params) ? params[0] : params;
+    const id = rawId === '_' ? undefined : rawId; // '_' is rewrite placeholder for base route
 
     // Routes without ID: GET all, POST create
     if (!id) {

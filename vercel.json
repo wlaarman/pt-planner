@@ -9,6 +9,12 @@
     }
   },
   "rewrites": [
+    { "source": "/api/appointments", "destination": "/api/appointments/_" },
+    { "source": "/api/trainers", "destination": "/api/trainers/_" },
+    { "source": "/api/participants", "destination": "/api/participants/_" },
+    { "source": "/api/training-types", "destination": "/api/training-types/_" },
+    { "source": "/api/reports", "destination": "/api/reports/_" },
+    { "source": "/api/invoices", "destination": "/api/invoices/_" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
