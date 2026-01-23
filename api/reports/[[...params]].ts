@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { params } = req.query;
+    const params = req.query['...params'];
     const action = Array.isArray(params) ? params[0] : params;
 
     // /reports/participants - get participants list for reports

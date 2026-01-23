@@ -119,16 +119,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { path } = req.query;
-    const route = Array.isArray(path) ? path[0] : path;
-
-    console.log('Auth route debug:', { query: req.query, path, route, url: req.url });
+    const pathParam = req.query['...path'];
+    const route = Array.isArray(pathParam) ? pathParam[0] : pathParam;
 
     switch (route) {
       case 'login': return handleLogin(req, res);
       case 'register': return handleRegister(req, res);
       case 'me': return handleMe(req, res);
-      default: return res.status(404).json({ error: 'Not found', debug: { query: req.query, path, route } });
+      default: return res.status(404).json({ error: 'Not found' });
     }
   } catch (error) {
     if (error instanceof z.ZodError) {

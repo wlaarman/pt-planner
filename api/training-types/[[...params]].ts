@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { params } = req.query;
+    const params = req.query['...params'];
     const id = Array.isArray(params) ? params[0] : params;
 
     // Routes without ID: GET all, POST create

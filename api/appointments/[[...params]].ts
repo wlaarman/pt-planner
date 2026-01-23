@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { params } = req.query;
+    const params = req.query['...params'];
     const pathParts = Array.isArray(params) ? params : params ? [params] : [];
     const id = pathParts[0];
     const action = pathParts[1]; // 'status' if present
