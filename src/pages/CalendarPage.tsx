@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   format,
   startOfWeek,
@@ -15,6 +15,8 @@ import {
   eachDayOfInterval,
   isSameMonth,
   getDay,
+  setHours,
+  setMinutes,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
@@ -22,6 +24,20 @@ import { appointmentsApi, trainersApi } from '../lib/api';
 import clsx from 'clsx';
 import AppointmentModal from '../components/AppointmentModal';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  DragEndEvent,
+  DragStartEvent,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 6); // 6:00 - 20:00
 
@@ -34,6 +50,117 @@ interface Appointment {
   participants: { id: string; name: string; email: string }[];
 }
 
+// Draggable Appointment Component
+function DraggableAppointment({
+  apt,
+  style,
+  onClick,
+}: {
+  apt: Appointment;
+  style: React.CSSProperties;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: apt.id,
+    data: { appointment: apt },
+  });
+
+  const dragStyle = {
+    ...style,
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+    touchAction: 'manipulation' as const,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        // Prevent click when dragging
+        if (!isDragging) {
+          e.stopPropagation();
+          onClick();
+        }
+      }}
+      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10"
+      style={{
+        ...dragStyle,
+        backgroundColor: `${apt.trainer.color}20`,
+        borderLeftColor: apt.trainer.color,
+      }}
+    >
+      <div className="text-xs font-semibold truncate" style={{ color: apt.trainer.color }}>
+        {format(new Date(apt.startTime), 'HH:mm')} - {format(new Date(apt.endTime), 'HH:mm')}
+      </div>
+      <div className="text-xs font-medium text-gray-900 truncate">
+        {apt.participants.map((p) => p.name).join(', ')}
+      </div>
+      <div className="text-xs text-gray-500 truncate">
+        {apt.trainingType.name}
+      </div>
+    </div>
+  );
+}
+
+// Droppable Time Slot Component
+function DroppableTimeSlot({
+  id,
+  hour,
+  children,
+  onClick,
+}: {
+  id: string;
+  hour: number;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={clsx(
+        'absolute left-0 right-0 h-[60px] border-b border-gray-100 transition-colors',
+        isOver ? 'bg-primary-100/50' : 'hover:bg-primary-50/30'
+      )}
+      style={{ top: `${(hour - 6) * 60}px` }}
+      onClick={onClick}
+    >
+      {/* Quarter hour lines */}
+      <div className="absolute left-0 right-0 top-[15px] border-b border-gray-50" />
+      <div className="absolute left-0 right-0 top-[30px] border-b border-gray-50" />
+      <div className="absolute left-0 right-0 top-[45px] border-b border-gray-50" />
+      {children}
+    </div>
+  );
+}
+
+// Drag Overlay Preview
+function AppointmentDragPreview({ apt }: { apt: Appointment }) {
+  return (
+    <div
+      className="rounded-lg px-3 py-2 text-left overflow-hidden shadow-xl border-l-4 w-48"
+      style={{
+        backgroundColor: `${apt.trainer.color}30`,
+        borderLeftColor: apt.trainer.color,
+      }}
+    >
+      <div className="text-xs font-semibold" style={{ color: apt.trainer.color }}>
+        {format(new Date(apt.startTime), 'HH:mm')} - {format(new Date(apt.endTime), 'HH:mm')}
+      </div>
+      <div className="text-sm font-medium text-gray-900 truncate">
+        {apt.participants.map((p) => p.name).join(', ')}
+      </div>
+      <div className="text-xs text-gray-500">
+        {apt.trainingType.name}
+      </div>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
@@ -41,10 +168,25 @@ export default function CalendarPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [createInitialData, setCreateInitialData] = useState<{ date?: Date; startTime?: string } | null>(null);
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
 
   const calendarRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
+
+  const queryClient = useQueryClient();
+
+  // Setup drag sensors with proper activation constraints
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 }, // 8px before drag starts
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 200, // 200ms delay before drag on touch
+      tolerance: 5, // Can move 5px during delay
+    },
+  });
+  const sensors = useSensors(pointerSensor, touchSensor);
 
   // Detect if mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -68,6 +210,64 @@ export default function CalendarPage() {
     queryFn: () =>
       appointmentsApi.getAll(weekStart.toISOString(), weekEnd.toISOString()),
   });
+
+  // Mutation for updating appointment time via drag & drop
+  const updateAppointmentMutation = useMutation({
+    mutationFn: ({ id, startTime, endTime }: { id: string; startTime: string; endTime: string }) =>
+      appointmentsApi.update(id, { startTime, endTime }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+  });
+
+  // Drag handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const apt = appointments.find((a) => a.id === active.id);
+    if (apt) {
+      setActiveAppointment(apt);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveAppointment(null);
+
+    if (!over || !active.id) return;
+
+    // Parse droppable ID: "slot-{dayIndex}-{hour}"
+    const match = over.id.toString().match(/^slot-(\d+)-(\d+)$/);
+    if (!match) return;
+
+    const dayIndex = parseInt(match[1], 10);
+    const hour = parseInt(match[2], 10);
+
+    const apt = appointments.find((a) => a.id === active.id);
+    if (!apt) return;
+
+    // Calculate new times
+    const oldStart = new Date(apt.startTime);
+    const oldEnd = new Date(apt.endTime);
+    const durationMs = oldEnd.getTime() - oldStart.getTime();
+
+    // Get the target day
+    const targetDay = addDays(weekStart, dayIndex);
+    const newStart = setMinutes(setHours(targetDay, hour), 0);
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    // Only update if time actually changed
+    if (newStart.getTime() !== oldStart.getTime()) {
+      updateAppointmentMutation.mutate({
+        id: apt.id,
+        startTime: newStart.toISOString(),
+        endTime: newEnd.toISOString(),
+      });
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveAppointment(null);
+  };
 
   // Initialize selected trainers when trainers load
   useMemo(() => {
@@ -306,117 +506,120 @@ export default function CalendarPage() {
         </div>
       </header>
 
-      {/* Calendar Grid */}
-      <div
-        ref={calendarRef}
-        className="flex-1 overflow-auto bg-white"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+      {/* Calendar Grid with Drag & Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        <div className="flex min-h-full">
-          {/* Time column */}
-          <div className="w-12 lg:w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50">
-            {!isMobile && <div className="h-12 lg:h-14 border-b border-gray-200" />}
-            {HOURS.map((hour) => (
-              <div
-                key={hour}
-                className="h-[60px] text-right pr-2 text-xs text-gray-400 -mt-2"
-              >
-                {hour}:00
-              </div>
-            ))}
-          </div>
+        <div
+          ref={calendarRef}
+          className="flex-1 overflow-auto bg-white"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="flex min-h-full">
+            {/* Time column */}
+            <div className="w-12 lg:w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50">
+              {!isMobile && <div className="h-12 lg:h-14 border-b border-gray-200" />}
+              {HOURS.map((hour) => (
+                <div
+                  key={hour}
+                  className="h-[60px] text-right pr-2 text-xs text-gray-400 -mt-2"
+                >
+                  {hour}:00
+                </div>
+              ))}
+            </div>
 
-          {/* Days */}
-          <div className={clsx('flex-1', !isMobile && 'grid grid-cols-7')}>
-            {days.map((day, dayIndex) => (
-              <div
-                key={dayIndex}
-                className={clsx(
-                  'border-r border-gray-200 last:border-r-0 min-w-0',
-                  !isMobile && (dayIndex === 5 || dayIndex === 6) && 'bg-gray-50/50'
-                )}
-              >
-                {/* Day header - only on desktop week view */}
-                {!isMobile && (
+            {/* Days */}
+            <div className={clsx('flex-1', !isMobile && 'grid grid-cols-7')}>
+              {days.map((day, dayIndex) => {
+                // For mobile view, calculate the actual day index relative to week start
+                const actualDayIndex = isMobile
+                  ? Math.floor((day.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000))
+                  : dayIndex;
+
+                return (
                   <div
+                    key={dayIndex}
                     className={clsx(
-                      'h-12 lg:h-14 flex flex-col items-center justify-center border-b border-gray-200 sticky top-0 bg-white z-10',
-                      isToday(day) && 'bg-primary-500 text-white'
+                      'border-r border-gray-200 last:border-r-0 min-w-0',
+                      !isMobile && (dayIndex === 5 || dayIndex === 6) && 'bg-gray-50/50'
                     )}
                   >
-                    <span className={clsx('text-xs uppercase', isToday(day) ? 'text-white/80' : 'text-gray-500')}>
-                      {format(day, 'EEE', { locale: nl })}
-                    </span>
-                    <span className="text-lg font-semibold">
-                      {format(day, 'd')}
-                    </span>
-                  </div>
-                )}
-
-                {/* Day events */}
-                <div className="relative" style={{ height: `${HOURS.length * 60}px` }}>
-                  {/* Hour grid lines */}
-                  {HOURS.map((hour) => (
-                    <div
-                      key={hour}
-                      className="absolute left-0 right-0 h-[60px] border-b border-gray-100 cursor-pointer hover:bg-primary-50/30 transition-colors"
-                      style={{ top: `${(hour - 6) * 60}px` }}
-                      onClick={() => handleTimeSlotClick(day, hour)}
-                    >
-                      {/* Quarter hour lines */}
-                      <div className="absolute left-0 right-0 top-[15px] border-b border-gray-50" />
-                      <div className="absolute left-0 right-0 top-[30px] border-b border-gray-50" />
-                      <div className="absolute left-0 right-0 top-[45px] border-b border-gray-50" />
-                    </div>
-                  ))}
-
-                  {/* Current time indicator */}
-                  {isToday(day) && (
-                    <div
-                      className="absolute left-0 right-0 z-20 pointer-events-none"
-                      style={{
-                        top: `${(new Date().getHours() + new Date().getMinutes() / 60 - 6) * 60}px`,
-                      }}
-                    >
-                      <div className="relative">
-                        <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full" />
-                        <div className="h-0.5 bg-red-500" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Appointments */}
-                  {filteredAppointments
-                    .filter((apt) => isSameDay(new Date(apt.startTime), day))
-                    .map((apt) => (
-                      <button
-                        key={apt.id}
-                        onClick={() => handleAppointmentClick(apt)}
-                        className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10"
-                        style={{
-                          ...getAppointmentStyle(apt),
-                          backgroundColor: `${apt.trainer.color}20`,
-                          borderLeftColor: apt.trainer.color,
-                        }}
+                    {/* Day header - only on desktop week view */}
+                    {!isMobile && (
+                      <div
+                        className={clsx(
+                          'h-12 lg:h-14 flex flex-col items-center justify-center border-b border-gray-200 sticky top-0 bg-white z-10',
+                          isToday(day) && 'bg-primary-500 text-white'
+                        )}
                       >
-                        <div className="text-xs font-semibold truncate" style={{ color: apt.trainer.color }}>
-                          {format(new Date(apt.startTime), 'HH:mm')} - {format(new Date(apt.endTime), 'HH:mm')}
+                        <span className={clsx('text-xs uppercase', isToday(day) ? 'text-white/80' : 'text-gray-500')}>
+                          {format(day, 'EEE', { locale: nl })}
+                        </span>
+                        <span className="text-lg font-semibold">
+                          {format(day, 'd')}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Day events */}
+                    <div className="relative" style={{ height: `${HOURS.length * 60}px` }}>
+                      {/* Droppable time slots */}
+                      {HOURS.map((hour) => (
+                        <DroppableTimeSlot
+                          key={`slot-${actualDayIndex}-${hour}`}
+                          id={`slot-${actualDayIndex}-${hour}`}
+                          hour={hour}
+                          onClick={() => handleTimeSlotClick(day, hour)}
+                        >
+                          {null}
+                        </DroppableTimeSlot>
+                      ))}
+
+                      {/* Current time indicator */}
+                      {isToday(day) && (
+                        <div
+                          className="absolute left-0 right-0 z-20 pointer-events-none"
+                          style={{
+                            top: `${(new Date().getHours() + new Date().getMinutes() / 60 - 6) * 60}px`,
+                          }}
+                        >
+                          <div className="relative">
+                            <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full" />
+                            <div className="h-0.5 bg-red-500" />
+                          </div>
                         </div>
-                        <div className="text-xs font-medium text-gray-900 truncate">
-                          {apt.participants.map((p) => p.name).join(', ')}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {apt.trainingType.name}
-                        </div>
-                      </button>
-                    ))}
-                </div>
-              </div>
-            ))}
+                      )}
+
+                      {/* Draggable Appointments */}
+                      {filteredAppointments
+                        .filter((apt) => isSameDay(new Date(apt.startTime), day))
+                        .map((apt) => (
+                          <DraggableAppointment
+                            key={apt.id}
+                            apt={apt}
+                            style={getAppointmentStyle(apt)}
+                            onClick={() => handleAppointmentClick(apt)}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Drag Overlay */}
+        <DragOverlay>
+          {activeAppointment && <AppointmentDragPreview apt={activeAppointment} />}
+        </DragOverlay>
+      </DndContext>
 
       {/* Modals */}
       <AppointmentModal
