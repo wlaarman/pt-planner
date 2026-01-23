@@ -3,6 +3,11 @@
   "buildCommand": "prisma generate && npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "api/lib/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" }
   ]
