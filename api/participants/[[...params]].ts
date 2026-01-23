@@ -1,7 +1,39 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { prisma } from '../lib/prisma';
-import { authenticate, unauthorized, setCorsHeaders } from '../lib/auth';
+
+// === Inline helpers (Vercel doesn't bundle lib directory) ===
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+interface AuthUser { id: string; email: string; role: string; }
+
+async function authenticate(req: VercelRequest): Promise<AuthUser | null> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret') as AuthUser;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
+    if (!user || !user.isActive) return null;
+    return { id: user.id, email: user.email, role: user.role };
+  } catch { return null; }
+}
+
+function unauthorized(res: VercelResponse) { return res.status(401).json({ error: 'Unauthorized' }); }
+
+function setCorsHeaders(res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+}
+// === End inline helpers ===
 
 const participantSchema = z.object({
   name: z.string().min(1),
