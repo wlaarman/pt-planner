@@ -65,6 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const id = pathParts[0] === '_' ? undefined : pathParts[0]; // '_' is rewrite placeholder for base route
     const action = pathParts[1]; // 'status' if present
 
+    // Debug logging
+    console.log('Appointments API:', { method: req.method, params, pathParts, id, action, body: req.body });
+
     // Routes without ID: GET all, POST create
     if (!id) {
       if (req.method === 'GET') {
@@ -313,7 +316,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(204).end();
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed', debug: { method: req.method, id, action } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });

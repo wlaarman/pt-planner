@@ -96,9 +96,19 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Demo login: jan@ptplanner.nl / trainer123
-        </p>
+        <div className="text-center mt-6">
+          <p className="text-sm text-gray-500 mb-2">Demo account:</p>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('jan@ptplanner.nl');
+              setPassword('trainer123');
+            }}
+            className="text-sm text-primary-500 hover:text-primary-600 font-medium"
+          >
+            Vul demo gegevens in →
+          </button>
+        </div>
       </div>
     </div>
   );

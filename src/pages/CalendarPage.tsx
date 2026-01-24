@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   format,
@@ -199,8 +199,11 @@ function AppointmentDragPreview({ apt }: { apt: Appointment }) {
   );
 }
 
+type ViewMode = 'day' | 'week';
+
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -226,14 +229,6 @@ export default function CalendarPage() {
   });
   const sensors = useSensors(pointerSensor, touchSensor);
 
-  // Detect if mobile
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -259,7 +254,37 @@ export default function CalendarPage() {
   const updateAppointmentMutation = useMutation({
     mutationFn: ({ id, startTime, endTime }: { id: string; startTime: string; endTime: string }) =>
       appointmentsApi.update(id, { startTime, endTime }),
-    onSuccess: () => {
+    onMutate: async ({ id, startTime, endTime }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['appointments'] });
+
+      // Snapshot previous value
+      const previousAppointments = queryClient.getQueryData(['appointments', weekStart.toISOString(), weekEnd.toISOString()]);
+
+      // Optimistically update
+      queryClient.setQueryData(
+        ['appointments', weekStart.toISOString(), weekEnd.toISOString()],
+        (old: Appointment[] | undefined) =>
+          old?.map(apt => apt.id === id ? { ...apt, startTime, endTime } : apt) ?? []
+      );
+
+      return { previousAppointments };
+    },
+    onError: (err: any, _variables, context) => {
+      // Rollback on error
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(
+          ['appointments', weekStart.toISOString(), weekEnd.toISOString()],
+          context.previousAppointments
+        );
+      }
+      const data = err?.response?.data;
+      const errorMsg = data?.error || data?.details?.[0]?.message || err?.message || 'Onbekende fout';
+      const debugInfo = data?.debug ? ` (debug: ${JSON.stringify(data.debug)})` : '';
+      console.error('Failed to update appointment:', data || err);
+      alert(`Kon afspraak niet verplaatsen: ${errorMsg}${debugInfo}`);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
   });
@@ -320,9 +345,10 @@ export default function CalendarPage() {
     }
   }, [trainers]);
 
-  const days = isMobile
-    ? [currentDate] // Single day on mobile
-    : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // Days to display based on view mode (not screen size)
+  const days = viewMode === 'day'
+    ? [currentDate] // Single day view
+    : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Week view
 
   const filteredAppointments = appointments.filter(
     (apt) =>
@@ -365,10 +391,10 @@ export default function CalendarPage() {
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
       if (diffX > 0) {
         // Swipe left - next day/week
-        setCurrentDate(isMobile ? addDays(currentDate, 1) : addWeeks(currentDate, 1));
+        setCurrentDate(viewMode === 'day' ? addDays(currentDate, 1) : addWeeks(currentDate, 1));
       } else {
         // Swipe right - previous day/week
-        setCurrentDate(isMobile ? subDays(currentDate, 1) : subWeeks(currentDate, 1));
+        setCurrentDate(viewMode === 'day' ? subDays(currentDate, 1) : subWeeks(currentDate, 1));
       }
     }
   };
@@ -416,7 +442,7 @@ export default function CalendarPage() {
             {/* Navigation */}
             <div className="flex items-center gap-1 lg:gap-2">
               <button
-                onClick={() => setCurrentDate(isMobile ? subDays(currentDate, 1) : subWeeks(currentDate, 1))}
+                onClick={() => setCurrentDate(viewMode === 'day' ? subDays(currentDate, 1) : subWeeks(currentDate, 1))}
                 className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -428,7 +454,7 @@ export default function CalendarPage() {
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[140px] justify-center"
               >
                 <span className="font-semibold text-gray-900">
-                  {isMobile
+                  {viewMode === 'day'
                     ? format(currentDate, 'd MMMM', { locale: nl })
                     : format(currentDate, 'MMMM yyyy', { locale: nl })}
                 </span>
@@ -436,7 +462,7 @@ export default function CalendarPage() {
               </button>
 
               <button
-                onClick={() => setCurrentDate(isMobile ? addDays(currentDate, 1) : addWeeks(currentDate, 1))}
+                onClick={() => setCurrentDate(viewMode === 'day' ? addDays(currentDate, 1) : addWeeks(currentDate, 1))}
                 className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -448,6 +474,32 @@ export default function CalendarPage() {
               >
                 Vandaag
               </button>
+
+              {/* View mode toggle */}
+              <div className="ml-2 flex rounded-lg border border-gray-300 overflow-hidden">
+                <button
+                  onClick={() => setViewMode('day')}
+                  className={clsx(
+                    'px-3 py-1.5 text-sm transition-colors',
+                    viewMode === 'day'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  Dag
+                </button>
+                <button
+                  onClick={() => setViewMode('week')}
+                  className={clsx(
+                    'px-3 py-1.5 text-sm transition-colors border-l border-gray-300',
+                    viewMode === 'week'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  Week
+                </button>
+              </div>
             </div>
           </div>
 
@@ -567,7 +619,7 @@ export default function CalendarPage() {
           <div className="flex min-h-full">
             {/* Time column */}
             <div className="w-12 lg:w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50">
-              {!isMobile && <div className="h-12 lg:h-14 border-b border-gray-200" />}
+              {viewMode === 'week' && <div className="h-12 lg:h-14 border-b border-gray-200" />}
               {HOURS.map((hour) => (
                 <div
                   key={hour}
@@ -579,10 +631,10 @@ export default function CalendarPage() {
             </div>
 
             {/* Days */}
-            <div className={clsx('flex-1', !isMobile && 'grid grid-cols-7')}>
+            <div className={clsx('flex-1', viewMode === 'week' && 'grid grid-cols-7')}>
               {days.map((day, dayIndex) => {
-                // For mobile view, calculate the actual day index relative to week start
-                const actualDayIndex = isMobile
+                // For day view, calculate the actual day index relative to week start
+                const actualDayIndex = viewMode === 'day'
                   ? Math.floor((day.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000))
                   : dayIndex;
 
@@ -591,11 +643,11 @@ export default function CalendarPage() {
                     key={dayIndex}
                     className={clsx(
                       'border-r border-gray-200 last:border-r-0 min-w-0',
-                      !isMobile && (dayIndex === 5 || dayIndex === 6) && 'bg-gray-50/50'
+                      viewMode === 'week' && (dayIndex === 5 || dayIndex === 6) && 'bg-gray-50/50'
                     )}
                   >
-                    {/* Day header - only on desktop week view */}
-                    {!isMobile && (
+                    {/* Day header - only in week view */}
+                    {viewMode === 'week' && (
                       <div
                         className={clsx(
                           'h-12 lg:h-14 flex flex-col items-center justify-center border-b border-gray-200 sticky top-0 bg-white z-10',
