@@ -97,7 +97,10 @@ Belangrijke modellen:
 
 ## Known Issues / TODOs
 - Google Calendar OAuth is nog niet geïmplementeerd (iCal werkt wel)
-- Drag & drop: "Method not allowed" error bij verplaatsen afspraken - debug logging toegevoegd
+- **[IN PROGRESS] Drag & drop bug**: "Method not allowed" error bij verplaatsen afspraken
+  - Debug logging toegevoegd in `src/pages/CalendarPage.tsx` (commit 06bac15)
+  - Gedeployed naar productie
+  - **Volgende stap:** Test drag & drop op https://personaltrainer-psi.vercel.app, open console (F12) en bekijk de error details om te bepalen of het probleem in de API route zit (waarschijnlijk `/api/appointments/[[...params]].ts`)
 
 ## Taal
 De applicatie is in het **Nederlands**.
