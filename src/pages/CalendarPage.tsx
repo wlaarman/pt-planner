@@ -477,13 +477,18 @@ export default function CalendarPage() {
     const pos = positions.get(apt.id);
 
     if (pos && pos.totalColumns > 1) {
-      const width = 100 / pos.totalColumns;
-      const left = pos.column * width;
+      const totalColumns = pos.totalColumns;
+      const gap = 0.5; // 0.5% gap between columns
+      const padding = 1; // 1% padding on outer edges
+      const availableWidth = 100 - (2 * padding) - ((totalColumns - 1) * gap);
+      const columnWidth = availableWidth / totalColumns;
+      const left = padding + (pos.column * (columnWidth + gap));
+
       return {
         top: `${top}px`,
         height: `${height}px`,
         left: `${left}%`,
-        width: `${width}%`,
+        width: `${columnWidth}%`,
       };
     }
 
