@@ -106,26 +106,29 @@ function DraggableAppointment({
           onClick();
         }
       }}
-      className={clsx(
-        "absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10",
-        isPast && "grayscale"
-      )}
+      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10"
       style={{
         ...dragStyle,
-        backgroundColor: `${apt.trainer.color}20`,
+        backgroundColor: isPast ? `${apt.trainer.color}10` : `${apt.trainer.color}20`,
         borderLeftColor: apt.trainer.color,
       }}
     >
       <div
-        className={clsx("text-xs font-semibold truncate", isPast && "text-gray-500")}
-        style={{ color: isPast ? undefined : apt.trainer.color }}
+        className="text-xs font-semibold truncate"
+        style={{ color: apt.trainer.color, opacity: isPast ? 0.6 : 1 }}
       >
         {format(new Date(apt.startTime), 'HH:mm')} - {format(new Date(apt.endTime), 'HH:mm')}
       </div>
-      <div className={clsx("text-xs font-medium truncate", isPast ? "text-gray-500" : "text-gray-900")}>
+      <div
+        className="text-xs font-medium truncate"
+        style={{ color: isPast ? '#6b7280' : '#111827', opacity: isPast ? 0.7 : 1 }}
+      >
         {apt.participants.map((p) => p.name).join(', ')}
       </div>
-      <div className={clsx("text-xs truncate", isPast ? "text-gray-400" : "text-gray-500")}>
+      <div
+        className="text-xs truncate"
+        style={{ color: isPast ? '#9ca3af' : '#6b7280' }}
+      >
         {apt.trainingType.name}
       </div>
     </div>
@@ -178,23 +181,21 @@ function ExternalEvent({
 
   return (
     <div
-      className={clsx(
-        "absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5",
-        isPast ? "opacity-50 grayscale" : "opacity-70"
-      )}
+      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5"
       style={{
         ...style,
         backgroundColor: '#f3f4f6',
         borderLeftColor: '#9ca3af',
+        opacity: isPast ? 0.5 : 0.7,
       }}
     >
-      <div className={clsx("text-xs font-semibold truncate", isPast ? "text-gray-400" : "text-gray-500")}>
+      <div className="text-xs font-semibold truncate text-gray-500">
         {format(new Date(event.startTime), 'HH:mm')} - {format(new Date(event.endTime), 'HH:mm')}
       </div>
-      <div className={clsx("text-xs font-medium truncate", isPast ? "text-gray-500" : "text-gray-700")}>
+      <div className="text-xs font-medium truncate text-gray-700">
         {event.title}
       </div>
-      <div className={clsx("text-xs truncate", isPast ? "text-gray-300" : "text-gray-400")}>
+      <div className="text-xs truncate text-gray-400">
         Externe kalender
       </div>
     </div>
