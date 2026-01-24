@@ -60,13 +60,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const params = req.query['...params'];
-    const pathParts = Array.isArray(params) ? params : params ? [params] : [];
+    // Parse path from URL - more reliable than query params for Vercel serverless
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const pathSegments = url.pathname.replace('/api/appointments', '').split('/').filter(Boolean);
+
+    // Also check query params as fallback (for rewrites)
+    const queryParams = req.query['...params'];
+    const queryParts = Array.isArray(queryParams) ? queryParams : queryParams ? [queryParams] : [];
+
+    // Use URL path segments if available, otherwise fall back to query params
+    const pathParts = pathSegments.length > 0 ? pathSegments : queryParts;
     const id = pathParts[0] === '_' ? undefined : pathParts[0]; // '_' is rewrite placeholder for base route
     const action = pathParts[1]; // 'status' if present
 
     // Debug logging
-    console.log('Appointments API:', { method: req.method, params, pathParts, id, action, body: req.body });
+    console.log('Appointments API:', { method: req.method, url: req.url, pathSegments, queryParts, pathParts, id, action, body: req.body });
 
     // Routes without ID: GET all, POST create
     if (!id) {
