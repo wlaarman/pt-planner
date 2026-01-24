@@ -86,6 +86,9 @@ function DraggableAppointment({
   // Check if appointment is in the past
   const isPast = new Date(apt.endTime) < new Date();
 
+  // Check if this has overlap positioning (has explicit left/width)
+  const hasOverlapStyle = 'left' in style && 'width' in style;
+
   const dragStyle = {
     ...style,
     transform: CSS.Translate.toString(transform),
@@ -106,7 +109,10 @@ function DraggableAppointment({
           onClick();
         }
       }}
-      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10"
+      className={clsx(
+        "absolute rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10",
+        !hasOverlapStyle && "left-1 right-1"
+      )}
       style={{
         ...dragStyle,
         backgroundColor: isPast ? `${apt.trainer.color}10` : `${apt.trainer.color}20`,
@@ -179,9 +185,15 @@ function ExternalEvent({
   // Check if event is in the past
   const isPast = new Date(event.endTime) < new Date();
 
+  // Check if this has overlap positioning (has explicit left/width)
+  const hasOverlapStyle = 'left' in style && 'width' in style;
+
   return (
     <div
-      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5"
+      className={clsx(
+        "absolute rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5",
+        !hasOverlapStyle && "left-1 right-1"
+      )}
       style={{
         ...style,
         backgroundColor: '#f3f4f6',
