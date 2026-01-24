@@ -95,12 +95,14 @@ Belangrijke modellen:
 - `Invoice` - Facturen
 - `CalendarConnection` - OAuth calendar connections (nog niet geïmplementeerd)
 
+## Vercel Beperkingen
+- **Hobby plan limiet:** Max 12 serverless functions per deployment
+- Huidige functions: 12 (op de limiet!)
+- **Oplossing:** Combineer routes in één file waar mogelijk (bijv. `[id].ts` handelt GET/PUT/PATCH/DELETE af)
+- Vermijd aparte files voor sub-routes zoals `/api/xxx/[id]/action` - combineer in `[id].ts`
+
 ## Known Issues / TODOs
 - Google Calendar OAuth is nog niet geïmplementeerd (iCal werkt wel)
-- **[IN PROGRESS] Drag & drop bug**: "Method not allowed" error bij verplaatsen afspraken
-  - Debug logging toegevoegd in `src/pages/CalendarPage.tsx` (commit 06bac15)
-  - Gedeployed naar productie
-  - **Volgende stap:** Test drag & drop op https://personaltrainer-psi.vercel.app, open console (F12) en bekijk de error details om te bepalen of het probleem in de API route zit (waarschijnlijk `/api/appointments/[[...params]].ts`)
 
 ## Taal
 De applicatie is in het **Nederlands**.

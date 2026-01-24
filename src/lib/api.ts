@@ -145,7 +145,7 @@ export const appointmentsApi = {
     await api.delete(`/appointments/${id}`, { params });
   },
   updateStatus: async (id: string, status: string) => {
-    const { data } = await api.patch(`/appointments/${id}/status`, { status });
+    const { data } = await api.patch(`/appointments/${id}`, { status });
     return data;
   },
 };

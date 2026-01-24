@@ -156,6 +156,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // PATCH update status
+    if (req.method === 'PATCH') {
+      const { status } = req.body;
+
+      const validStatuses = ['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+
+      const appointment = await prisma.appointment.update({
+        where: { id },
+        data: { status },
+      });
+
+      return res.json(appointment);
+    }
+
     // DELETE appointment
     if (req.method === 'DELETE') {
       const { deleteSeries } = req.query;
