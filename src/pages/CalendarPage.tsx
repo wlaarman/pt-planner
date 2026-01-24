@@ -252,12 +252,8 @@ export default function CalendarPage() {
 
   // Mutation for updating appointment time via drag & drop
   const updateAppointmentMutation = useMutation({
-    mutationFn: async ({ id, startTime, endTime }: { id: string; startTime: string; endTime: string }) => {
-      console.log('Updating appointment:', { id, startTime, endTime });
-      const result = await appointmentsApi.update(id, { startTime, endTime });
-      console.log('Update result:', result);
-      return result;
-    },
+    mutationFn: ({ id, startTime, endTime }: { id: string; startTime: string; endTime: string }) =>
+      appointmentsApi.update(id, { startTime, endTime }),
     onMutate: async ({ id, startTime, endTime }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['appointments'] });
@@ -282,16 +278,9 @@ export default function CalendarPage() {
           context.previousAppointments
         );
       }
-      console.error('Full error object:', err);
-      console.error('Error response:', err?.response);
-      console.error('Error response data:', err?.response?.data);
-      console.error('Error response status:', err?.response?.status);
-      console.error('Error config:', err?.config);
-
       const data = err?.response?.data;
       const errorMsg = data?.error || data?.details?.[0]?.message || err?.message || 'Onbekende fout';
-      const debugInfo = data?.debug ? ` (debug: ${JSON.stringify(data.debug)})` : '';
-      alert(`Kon afspraak niet verplaatsen: ${errorMsg}${debugInfo}\n\nCheck browser console (F12) voor details.`);
+      alert(`Kon afspraak niet verplaatsen: ${errorMsg}`);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });

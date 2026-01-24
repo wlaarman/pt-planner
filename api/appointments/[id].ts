@@ -62,8 +62,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const id = req.query.id as string;
 
-    console.log('Appointments [id] API:', { method: req.method, id, body: req.body });
-
     if (!id) {
       return res.status(400).json({ error: 'Missing appointment ID' });
     }
