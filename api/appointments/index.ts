@@ -35,6 +35,57 @@ function setCorsHeaders(res: VercelResponse) {
 }
 // === End inline helpers ===
 
+// Check for overlapping appointments for the same trainer
+async function checkTrainerOverlap(
+  trainerId: string,
+  startTime: Date,
+  endTime: Date,
+  excludeAppointmentId?: string
+): Promise<{ hasOverlap: boolean; conflictingAppointment?: { id: string; startTime: Date; endTime: Date } }> {
+  const overlapping = await prisma.appointment.findFirst({
+    where: {
+      trainerId,
+      id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
+      AND: [
+        { startTime: { lt: endTime } },
+        { endTime: { gt: startTime } },
+      ],
+    },
+    select: { id: true, startTime: true, endTime: true },
+  });
+
+  return {
+    hasOverlap: !!overlapping,
+    conflictingAppointment: overlapping || undefined,
+  };
+}
+
+// Create audit log entry (non-blocking - doesn't fail if table doesn't exist yet)
+async function createAuditLog(
+  entityType: string,
+  entityId: string,
+  action: 'CREATE' | 'UPDATE' | 'DELETE',
+  userId: string | null,
+  oldValues?: Record<string, unknown>,
+  newValues?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entityType,
+        entityId,
+        action,
+        userId,
+        oldValues: oldValues ?? null,
+        newValues: newValues ?? null,
+      },
+    });
+  } catch (error) {
+    // Log error but don't fail the request - audit log table might not exist yet
+    console.warn('Failed to create audit log:', error);
+  }
+}
+
 const appointmentSchema = z.object({
   title: z.string().optional(),
   startTime: z.string().datetime(),
@@ -129,6 +180,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // Check for overlapping appointments
+      const { hasOverlap, conflictingAppointment } = await checkTrainerOverlap(
+        data.trainerId,
+        new Date(data.startTime),
+        new Date(data.endTime)
+      );
+
+      if (hasOverlap && conflictingAppointment) {
+        return res.status(409).json({
+          error: 'Deze trainer heeft al een afspraak op dit tijdstip',
+          conflictingAppointment: {
+            startTime: conflictingAppointment.startTime,
+            endTime: conflictingAppointment.endTime,
+          },
+        });
+      }
+
       const appointment = await prisma.appointment.create({
         data: {
           title: data.title,
@@ -160,6 +228,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
           },
         },
+      });
+
+      // Create audit log
+      await createAuditLog('Appointment', appointment.id, 'CREATE', authUser.id, undefined, {
+        ...data,
+        id: appointment.id,
       });
 
       return res.status(201).json({

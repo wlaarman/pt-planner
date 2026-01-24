@@ -41,6 +41,16 @@ import { CSS } from '@dnd-kit/utilities';
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 6); // 6:00 - 20:00
 
+// Get current time in Amsterdam timezone
+function getAmsterdamTime(): { hours: number; minutes: number } {
+  const now = new Date();
+  const amsterdamTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }));
+  return {
+    hours: amsterdamTime.getHours(),
+    minutes: amsterdamTime.getMinutes(),
+  };
+}
+
 interface Appointment {
   id: string;
   startTime: string;
@@ -73,10 +83,13 @@ function DraggableAppointment({
     data: { appointment: apt },
   });
 
+  // Check if appointment is in the past
+  const isPast = new Date(apt.endTime) < new Date();
+
   const dragStyle = {
     ...style,
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : isPast ? 0.6 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
     touchAction: 'manipulation' as const,
   };
@@ -93,20 +106,26 @@ function DraggableAppointment({
           onClick();
         }
       }}
-      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10"
+      className={clsx(
+        "absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all border-l-4 z-10",
+        isPast && "grayscale"
+      )}
       style={{
         ...dragStyle,
         backgroundColor: `${apt.trainer.color}20`,
         borderLeftColor: apt.trainer.color,
       }}
     >
-      <div className="text-xs font-semibold truncate" style={{ color: apt.trainer.color }}>
+      <div
+        className={clsx("text-xs font-semibold truncate", isPast && "text-gray-500")}
+        style={{ color: isPast ? undefined : apt.trainer.color }}
+      >
         {format(new Date(apt.startTime), 'HH:mm')} - {format(new Date(apt.endTime), 'HH:mm')}
       </div>
-      <div className="text-xs font-medium text-gray-900 truncate">
+      <div className={clsx("text-xs font-medium truncate", isPast ? "text-gray-500" : "text-gray-900")}>
         {apt.participants.map((p) => p.name).join(', ')}
       </div>
-      <div className="text-xs text-gray-500 truncate">
+      <div className={clsx("text-xs truncate", isPast ? "text-gray-400" : "text-gray-500")}>
         {apt.trainingType.name}
       </div>
     </div>
@@ -154,22 +173,28 @@ function ExternalEvent({
   event: ICalEvent;
   style: React.CSSProperties;
 }) {
+  // Check if event is in the past
+  const isPast = new Date(event.endTime) < new Date();
+
   return (
     <div
-      className="absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5 opacity-70"
+      className={clsx(
+        "absolute left-1 right-1 lg:left-1 lg:right-1 rounded-lg px-2 py-1 text-left overflow-hidden border-l-4 z-5",
+        isPast ? "opacity-50 grayscale" : "opacity-70"
+      )}
       style={{
         ...style,
         backgroundColor: '#f3f4f6',
         borderLeftColor: '#9ca3af',
       }}
     >
-      <div className="text-xs font-semibold text-gray-500 truncate">
+      <div className={clsx("text-xs font-semibold truncate", isPast ? "text-gray-400" : "text-gray-500")}>
         {format(new Date(event.startTime), 'HH:mm')} - {format(new Date(event.endTime), 'HH:mm')}
       </div>
-      <div className="text-xs font-medium text-gray-700 truncate">
+      <div className={clsx("text-xs font-medium truncate", isPast ? "text-gray-500" : "text-gray-700")}>
         {event.title}
       </div>
-      <div className="text-xs text-gray-400 truncate">
+      <div className={clsx("text-xs truncate", isPast ? "text-gray-300" : "text-gray-400")}>
         Externe kalender
       </div>
     </div>
@@ -361,7 +386,83 @@ export default function CalendarPage() {
     );
   };
 
-  const getAppointmentStyle = (apt: Appointment | ICalEvent) => {
+  // Calculate positions for overlapping appointments (side-by-side layout)
+  const calculateOverlapPositions = (appointments: (Appointment | ICalEvent)[]): Map<string, { column: number; totalColumns: number }> => {
+    const positions = new Map<string, { column: number; totalColumns: number }>();
+
+    if (appointments.length === 0) return positions;
+
+    // Sort by start time, then by end time
+    const sorted = [...appointments].sort((a, b) => {
+      const startDiff = new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+      if (startDiff !== 0) return startDiff;
+      return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
+    });
+
+    // Track columns: each column has the end time of its last appointment
+    const columns: number[] = [];
+
+    for (const apt of sorted) {
+      const aptStart = new Date(apt.startTime).getTime();
+      const aptEnd = new Date(apt.endTime).getTime();
+
+      // Find first column where this appointment fits (no overlap)
+      let column = columns.findIndex(colEnd => aptStart >= colEnd);
+
+      if (column === -1) {
+        // No column available, create new one
+        column = columns.length;
+        columns.push(aptEnd);
+      } else {
+        // Use existing column
+        columns[column] = aptEnd;
+      }
+
+      positions.set(apt.id, { column, totalColumns: 0 }); // totalColumns set later
+    }
+
+    // Calculate max columns for overlapping groups
+    for (const apt of sorted) {
+      const aptStart = new Date(apt.startTime).getTime();
+      const aptEnd = new Date(apt.endTime).getTime();
+
+      // Find all appointments that overlap with this one
+      const overlapping = sorted.filter(other => {
+        const otherStart = new Date(other.startTime).getTime();
+        const otherEnd = new Date(other.endTime).getTime();
+        return aptStart < otherEnd && aptEnd > otherStart;
+      });
+
+      // Get max column number among overlapping appointments
+      const maxColumn = Math.max(...overlapping.map(o => positions.get(o.id)?.column ?? 0));
+      const totalColumns = maxColumn + 1;
+
+      // Update all overlapping appointments with the correct totalColumns
+      for (const o of overlapping) {
+        const pos = positions.get(o.id);
+        if (pos && pos.totalColumns < totalColumns) {
+          positions.set(o.id, { ...pos, totalColumns });
+        }
+      }
+    }
+
+    return positions;
+  };
+
+  // Memoize overlap positions per day
+  const getOverlapPositionsForDay = useMemo(() => {
+    const cache = new Map<string, Map<string, { column: number; totalColumns: number }>>();
+
+    return (day: Date, dayAppointments: (Appointment | ICalEvent)[]) => {
+      const dayKey = day.toISOString().split('T')[0];
+      if (!cache.has(dayKey)) {
+        cache.set(dayKey, calculateOverlapPositions(dayAppointments));
+      }
+      return cache.get(dayKey)!;
+    };
+  }, [filteredAppointments, icalEvents]);
+
+  const getAppointmentStyle = (apt: Appointment | ICalEvent, day: Date, dayAppointments: (Appointment | ICalEvent)[]) => {
     const start = new Date(apt.startTime);
     const end = new Date(apt.endTime);
     const startHour = start.getHours() + start.getMinutes() / 60;
@@ -369,6 +470,21 @@ export default function CalendarPage() {
 
     const top = (startHour - 6) * 60; // 60px per hour
     const height = Math.max((endHour - startHour) * 60, 30); // Min height 30px
+
+    // Get overlap position for side-by-side layout
+    const positions = getOverlapPositionsForDay(day, dayAppointments);
+    const pos = positions.get(apt.id);
+
+    if (pos && pos.totalColumns > 1) {
+      const width = 100 / pos.totalColumns;
+      const left = pos.column * width;
+      return {
+        top: `${top}px`,
+        height: `${height}px`,
+        left: `${left}%`,
+        width: `${width}%`,
+      };
+    }
 
     return { top: `${top}px`, height: `${height}px` };
   };
@@ -675,43 +791,50 @@ export default function CalendarPage() {
                         </DroppableTimeSlot>
                       ))}
 
-                      {/* Current time indicator */}
-                      {isToday(day) && (
-                        <div
-                          className="absolute left-0 right-0 z-20 pointer-events-none"
-                          style={{
-                            top: `${(new Date().getHours() + new Date().getMinutes() / 60 - 6) * 60}px`,
-                          }}
-                        >
-                          <div className="relative">
-                            <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full" />
-                            <div className="h-0.5 bg-red-500" />
+                      {/* Current time indicator (Amsterdam timezone) */}
+                      {isToday(day) && (() => {
+                        const { hours, minutes } = getAmsterdamTime();
+                        return (
+                          <div
+                            className="absolute left-0 right-0 z-20 pointer-events-none"
+                            style={{
+                              top: `${(hours + minutes / 60 - 6) * 60}px`,
+                            }}
+                          >
+                            <div className="relative">
+                              <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full" />
+                              <div className="h-0.5 bg-red-500" />
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
-                      {/* Draggable Appointments */}
-                      {filteredAppointments
-                        .filter((apt) => isSameDay(new Date(apt.startTime), day))
-                        .map((apt) => (
-                          <DraggableAppointment
-                            key={apt.id}
-                            apt={apt}
-                            style={getAppointmentStyle(apt)}
-                            onClick={() => handleAppointmentClick(apt)}
-                          />
-                        ))}
+                      {/* Draggable Appointments & External iCal Events (with overlap handling) */}
+                      {(() => {
+                        const dayAppointments = filteredAppointments.filter((apt) => isSameDay(new Date(apt.startTime), day));
+                        const dayIcalEvents = icalEvents.filter((event) => isSameDay(new Date(event.startTime), day));
+                        const allDayEvents: (Appointment | ICalEvent)[] = [...dayAppointments, ...dayIcalEvents];
 
-                      {/* External iCal Events */}
-                      {icalEvents
-                        .filter((event) => isSameDay(new Date(event.startTime), day))
-                        .map((event) => (
-                          <ExternalEvent
-                            key={event.id}
-                            event={event}
-                            style={getAppointmentStyle(event)}
-                          />
-                        ))}
+                        return (
+                          <>
+                            {dayAppointments.map((apt) => (
+                              <DraggableAppointment
+                                key={apt.id}
+                                apt={apt}
+                                style={getAppointmentStyle(apt, day, allDayEvents)}
+                                onClick={() => handleAppointmentClick(apt)}
+                              />
+                            ))}
+                            {dayIcalEvents.map((event) => (
+                              <ExternalEvent
+                                key={event.id}
+                                event={event}
+                                style={getAppointmentStyle(event, day, allDayEvents)}
+                              />
+                            ))}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 );

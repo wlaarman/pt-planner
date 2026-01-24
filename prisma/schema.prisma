@@ -228,3 +228,27 @@ model InvoiceItem {
 
   @@map("invoice_items")
 }
+
+// Audit log for tracking all changes
+model AuditLog {
+  id              String    @id @default(cuid())
+  entityType      String    // e.g., "Appointment", "Participant", "Invoice"
+  entityId        String    // ID of the changed record
+  action          AuditAction
+  userId          String?   // Who made the change (null for system actions)
+  oldValues       Json?     // Previous values (for UPDATE/DELETE)
+  newValues       Json?     // New values (for CREATE/UPDATE)
+  metadata        Json?     // Additional context (e.g., IP address, user agent)
+  createdAt       DateTime  @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}

@@ -35,6 +35,57 @@ function setCorsHeaders(res: VercelResponse) {
 }
 // === End inline helpers ===
 
+// Check for overlapping appointments for the same trainer
+async function checkTrainerOverlap(
+  trainerId: string,
+  startTime: Date,
+  endTime: Date,
+  excludeAppointmentId?: string
+): Promise<{ hasOverlap: boolean; conflictingAppointment?: { id: string; startTime: Date; endTime: Date } }> {
+  const overlapping = await prisma.appointment.findFirst({
+    where: {
+      trainerId,
+      id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
+      AND: [
+        { startTime: { lt: endTime } },
+        { endTime: { gt: startTime } },
+      ],
+    },
+    select: { id: true, startTime: true, endTime: true },
+  });
+
+  return {
+    hasOverlap: !!overlapping,
+    conflictingAppointment: overlapping || undefined,
+  };
+}
+
+// Create audit log entry (non-blocking - doesn't fail if table doesn't exist yet)
+async function createAuditLog(
+  entityType: string,
+  entityId: string,
+  action: 'CREATE' | 'UPDATE' | 'DELETE',
+  userId: string | null,
+  oldValues?: Record<string, unknown>,
+  newValues?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entityType,
+        entityId,
+        action,
+        userId,
+        oldValues: oldValues ?? null,
+        newValues: newValues ?? null,
+      },
+    });
+  } catch (error) {
+    // Log error but don't fail the request - audit log table might not exist yet
+    console.warn('Failed to create audit log:', error);
+  }
+}
+
 const appointmentSchema = z.object({
   title: z.string().optional(),
   startTime: z.string().datetime(),
@@ -97,6 +148,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'PUT') {
       const data = appointmentSchema.partial().parse(req.body);
 
+      // Get current appointment to check for overlap
+      const currentAppointment = await prisma.appointment.findUnique({
+        where: { id },
+        select: { trainerId: true, startTime: true, endTime: true },
+      });
+
+      if (!currentAppointment) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+
+      // Check for overlap if trainer or time is changing
+      const newTrainerId = data.trainerId || currentAppointment.trainerId;
+      const newStartTime = data.startTime ? new Date(data.startTime) : currentAppointment.startTime;
+      const newEndTime = data.endTime ? new Date(data.endTime) : currentAppointment.endTime;
+
+      const { hasOverlap, conflictingAppointment } = await checkTrainerOverlap(
+        newTrainerId,
+        newStartTime,
+        newEndTime,
+        id // Exclude current appointment
+      );
+
+      if (hasOverlap && conflictingAppointment) {
+        return res.status(409).json({
+          error: 'Deze trainer heeft al een afspraak op dit tijdstip',
+          conflictingAppointment: {
+            startTime: conflictingAppointment.startTime,
+            endTime: conflictingAppointment.endTime,
+          },
+        });
+      }
+
       if (data.participantIds) {
         await prisma.appointmentParticipant.deleteMany({
           where: { appointmentId: id },
@@ -148,6 +231,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
 
+      // Create audit log for update
+      await createAuditLog('Appointment', id, 'UPDATE', authUser.id, {
+        trainerId: currentAppointment.trainerId,
+        startTime: currentAppointment.startTime,
+        endTime: currentAppointment.endTime,
+      }, data);
+
       return res.json({
         ...appointment,
         participants: appointment.participants.map((p) => p.participant),
@@ -163,10 +253,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid status' });
       }
 
+      // Get current status for audit log
+      const currentAppointment = await prisma.appointment.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+
       const appointment = await prisma.appointment.update({
         where: { id },
         data: { status },
       });
+
+      // Create audit log for status update
+      await createAuditLog('Appointment', id, 'UPDATE', authUser.id,
+        { status: currentAppointment?.status },
+        { status }
+      );
 
       return res.json(appointment);
     }
@@ -183,6 +285,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: 'Appointment not found' });
       }
 
+      // Store appointment data for audit log before deletion
+      const deletedData = {
+        ...appointment,
+        deleteSeries: deleteSeries === 'true',
+      };
+
       if (deleteSeries === 'true' && appointment.recurrenceId) {
         await prisma.appointment.deleteMany({
           where: {
@@ -197,6 +305,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: { id },
         });
       }
+
+      // Create audit log for deletion
+      await createAuditLog('Appointment', id, 'DELETE', authUser.id, deletedData, undefined);
 
       return res.status(204).end();
     }

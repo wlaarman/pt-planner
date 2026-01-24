@@ -47,13 +47,25 @@ export default function AppointmentDetailModal({
   const totalCost = durationHours * Number(hourlyRate);
 
   const handleDelete = () => {
+    const isPast = end < new Date();
+
+    // Warning for past appointments
+    if (isPast) {
+      const confirmPast = confirm(
+        '⚠️ Let op: Deze afspraak ligt in het verleden.\n\n' +
+        'Het verwijderen kan invloed hebben op facturatie en rapportages.\n\n' +
+        'Weet je zeker dat je wilt doorgaan?'
+      );
+      if (!confirmPast) return;
+    }
+
     if (appointment.isRecurring) {
       const deleteSeries = confirm(
         'Wil je de hele serie verwijderen? Klik op Annuleren om alleen deze afspraak te verwijderen.'
       );
       deleteMutation.mutate(deleteSeries);
     } else {
-      if (confirm('Weet je zeker dat je deze afspraak wilt verwijderen?')) {
+      if (isPast || confirm('Weet je zeker dat je deze afspraak wilt verwijderen?')) {
         deleteMutation.mutate(false);
       }
     }
