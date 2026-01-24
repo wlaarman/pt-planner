@@ -1,0 +1,197 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import { z } from 'zod';
+
+// === Inline helpers (Vercel doesn't bundle lib directory) ===
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+interface AuthUser { id: string; email: string; role: string; }
+
+async function authenticate(req: VercelRequest): Promise<AuthUser | null> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret') as AuthUser;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
+    if (!user || !user.isActive) return null;
+    return { id: user.id, email: user.email, role: user.role };
+  } catch { return null; }
+}
+
+function unauthorized(res: VercelResponse) { return res.status(401).json({ error: 'Unauthorized' }); }
+
+function setCorsHeaders(res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+}
+// === End inline helpers ===
+
+const appointmentSchema = z.object({
+  title: z.string().optional(),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime(),
+  notes: z.string().optional(),
+  trainerId: z.string(),
+  trainingTypeId: z.string(),
+  participantIds: z.array(z.string()).min(1),
+  isRecurring: z.boolean().default(false),
+  recurrenceRule: z.string().optional(),
+});
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(res);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const authUser = await authenticate(req);
+  if (!authUser) {
+    return unauthorized(res);
+  }
+
+  try {
+    const id = req.query.id as string;
+
+    console.log('Appointments [id] API:', { method: req.method, id, body: req.body });
+
+    if (!id) {
+      return res.status(400).json({ error: 'Missing appointment ID' });
+    }
+
+    // GET single appointment
+    if (req.method === 'GET') {
+      const appointment = await prisma.appointment.findUnique({
+        where: { id },
+        include: {
+          trainer: {
+            select: { id: true, name: true, color: true, hourlyRate: true },
+          },
+          trainingType: true,
+          participants: {
+            include: {
+              participant: true,
+            },
+          },
+        },
+      });
+
+      if (!appointment) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+
+      return res.json({
+        ...appointment,
+        participants: appointment.participants.map((p) => p.participant),
+      });
+    }
+
+    // PUT update appointment
+    if (req.method === 'PUT') {
+      const data = appointmentSchema.partial().parse(req.body);
+
+      if (data.participantIds) {
+        await prisma.appointmentParticipant.deleteMany({
+          where: { appointmentId: id },
+        });
+      }
+
+      const updateData: Record<string, unknown> = {
+        title: data.title,
+        startTime: data.startTime ? new Date(data.startTime) : undefined,
+        endTime: data.endTime ? new Date(data.endTime) : undefined,
+        notes: data.notes,
+        trainerId: data.trainerId,
+        trainingTypeId: data.trainingTypeId,
+        isRecurring: data.isRecurring,
+        recurrenceRule: data.recurrenceRule,
+      };
+
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+
+      if (data.participantIds) {
+        updateData.participants = {
+          create: data.participantIds.map((participantId) => ({
+            participantId,
+          })),
+        };
+      }
+
+      const appointment = await prisma.appointment.update({
+        where: { id },
+        data: updateData,
+        include: {
+          trainer: {
+            select: { id: true, name: true, color: true },
+          },
+          trainingType: {
+            select: { id: true, name: true, icon: true, color: true },
+          },
+          participants: {
+            include: {
+              participant: {
+                select: { id: true, name: true, email: true },
+              },
+            },
+          },
+        },
+      });
+
+      return res.json({
+        ...appointment,
+        participants: appointment.participants.map((p) => p.participant),
+      });
+    }
+
+    // DELETE appointment
+    if (req.method === 'DELETE') {
+      const { deleteSeries } = req.query;
+
+      const appointment = await prisma.appointment.findUnique({
+        where: { id },
+      });
+
+      if (!appointment) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+
+      if (deleteSeries === 'true' && appointment.recurrenceId) {
+        await prisma.appointment.deleteMany({
+          where: {
+            OR: [
+              { id: appointment.recurrenceId },
+              { recurrenceId: appointment.recurrenceId },
+            ],
+          },
+        });
+      } else {
+        await prisma.appointment.delete({
+          where: { id },
+        });
+      }
+
+      return res.status(204).end();
+    }
+
+    return res.status(405).json({ error: 'Method not allowed', debug: { method: req.method, id } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input', details: error.errors });
+    }
+    console.error('Appointments [id] error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
