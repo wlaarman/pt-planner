@@ -490,17 +490,27 @@ export default function CalendarPage() {
 
     if (pos && pos.totalColumns > 1) {
       const totalColumns = pos.totalColumns;
-      const gap = 0.5; // 0.5% gap between columns
-      const padding = 1; // 1% padding on outer edges
-      const availableWidth = 100 - (2 * padding) - ((totalColumns - 1) * gap);
-      const columnWidth = availableWidth / totalColumns;
-      const left = padding + (pos.column * (columnWidth + gap));
+      const paddingPx = 4; // 4px padding (matches left-1/right-1 = 0.25rem)
+      const gapPx = 2; // 2px gap between columns
+      const columnWidthPercent = 100 / totalColumns;
+
+      // Calculate left position with padding
+      const leftCalc = pos.column === 0
+        ? `${paddingPx}px` // First column: just padding
+        : `calc(${pos.column * columnWidthPercent}% + ${gapPx / 2}px)`;
+
+      // Calculate width with padding/gap
+      const widthCalc = pos.column === totalColumns - 1
+        ? `calc(${columnWidthPercent}% - ${paddingPx + gapPx / 2}px)` // Last column
+        : pos.column === 0
+          ? `calc(${columnWidthPercent}% - ${paddingPx + gapPx / 2}px)` // First column
+          : `calc(${columnWidthPercent}% - ${gapPx}px)`; // Middle columns
 
       return {
         top: `${top}px`,
         height: `${height}px`,
-        left: `${left}%`,
-        width: `${columnWidth}%`,
+        left: leftCalc,
+        width: widthCalc,
       };
     }
 
