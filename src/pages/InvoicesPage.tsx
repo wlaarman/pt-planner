@@ -1,9 +1,9 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesApi } from '../lib/api';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import {
-  Plus,
   Eye,
   Download,
   Check,
@@ -11,10 +11,14 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
-  Link as LinkIcon,
-  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Users,
+  Calculator,
 } from 'lucide-react';
 import clsx from 'clsx';
+import InvoiceGeneratorModal from '../components/InvoiceGeneratorModal';
 
 interface InvoiceStats {
   open: { count: number; total: number };
@@ -40,8 +44,43 @@ const statusConfig = {
   CANCELLED: { label: 'Geannuleerd', className: 'bg-gray-100 text-gray-500' },
 };
 
+interface BillableData {
+  participants: Array<{
+    id: string;
+    name: string;
+    email: string;
+    appointments: Array<{
+      id: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      duration: number;
+      trainer: { id: string; name: string; hourlyRate: number | null };
+      trainingType: { id: string; name: string; defaultRate: number | null };
+      rate: number;
+      amount: number;
+    }>;
+    totalMinutes: number;
+    totalHours: number;
+    totalAmount: number;
+  }>;
+  summary: {
+    totalParticipants: number;
+    totalHours: number;
+    totalAmount: number;
+  };
+}
+
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
+
+  // Period selector state - default to last month
+  const [selectedMonth, setSelectedMonth] = useState(() => subMonths(new Date(), 1));
+  const [showGeneratorModal, setShowGeneratorModal] = useState(false);
+
+  const periodStart = startOfMonth(selectedMonth);
+  const periodEnd = endOfMonth(selectedMonth);
+  const periodLabel = format(selectedMonth, 'MMMM yyyy', { locale: nl });
 
   const { data: stats } = useQuery<InvoiceStats>({
     queryKey: ['invoice-stats'],
@@ -51,6 +90,11 @@ export default function InvoicesPage() {
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: () => invoicesApi.getAll(),
+  });
+
+  const { data: billableData, isLoading: isBillableLoading } = useQuery<BillableData>({
+    queryKey: ['billable', periodStart.toISOString(), periodEnd.toISOString()],
+    queryFn: () => invoicesApi.getBillable(periodStart.toISOString(), periodEnd.toISOString()),
   });
 
   const updateStatusMutation = useMutation({
@@ -69,11 +113,68 @@ export default function InvoicesPage() {
     <div className="p-6">
       <header className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Facturatie</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
-          <Plus className="w-4 h-4" />
-          Nieuwe Factuur
-        </button>
       </header>
+
+      {/* Period Selector & Billable Summary */}
+      <div className="bg-gradient-to-r from-primary-50 to-white rounded-xl border border-primary-100 p-5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Period Selector */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-white rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="px-4 py-2 bg-white rounded-lg border border-gray-200 min-w-[180px] text-center">
+              <span className="font-medium text-gray-900 capitalize">{periodLabel}</span>
+            </div>
+            <button
+              onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-white rounded-lg transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Billable Summary */}
+          {isBillableLoading ? (
+            <div className="text-sm text-gray-500">Laden...</div>
+          ) : billableData && billableData.summary.totalParticipants > 0 ? (
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="w-4 h-4 text-primary-500" />
+                <span className="text-gray-600">
+                  {billableData.summary.totalHours.toFixed(1)} uur
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="w-4 h-4 text-primary-500" />
+                <span className="text-gray-600">
+                  {billableData.summary.totalParticipants} deelnemers
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Calculator className="w-4 h-4 text-primary-500" />
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(billableData.summary.totalAmount)}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowGeneratorModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Facturen Genereren
+              </button>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              Geen factureerbare afspraken in deze periode
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -239,12 +340,13 @@ export default function InvoicesPage() {
         </table>
       </div>
 
-      {/* Accounting Link */}
+      {/* Accounting Link - placeholder for future e-boekhouden integration */}
+      {/*
       <div className="mt-6 bg-gray-50 rounded-xl p-4 flex items-center justify-between">
         <div className="flex items-center gap-3 text-sm">
           <LinkIcon className="w-4 h-4 text-primary-500" />
           <span className="text-gray-600">
-            Gekoppeld met: <strong>Moneybird</strong>
+            Gekoppeld met: <strong>e-Boekhouden</strong>
           </span>
           <span className="text-gray-400">
             Laatst gesynchroniseerd: 5 min geleden
@@ -255,6 +357,17 @@ export default function InvoicesPage() {
           Synchroniseer Nu
         </button>
       </div>
+      */}
+
+      {/* Invoice Generator Modal */}
+      <InvoiceGeneratorModal
+        isOpen={showGeneratorModal}
+        onClose={() => setShowGeneratorModal(false)}
+        billableData={billableData || null}
+        periodStart={periodStart.toISOString()}
+        periodEnd={periodEnd.toISOString()}
+        periodLabel={periodLabel}
+      />
     </div>
   );
 }

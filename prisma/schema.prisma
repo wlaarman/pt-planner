@@ -97,6 +97,9 @@ model Appointment {
   // Status
   status          AppointmentStatus @default(SCHEDULED)
 
+  // Invoicing
+  invoicedAt      DateTime?   // When this appointment was invoiced (null = not yet)
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

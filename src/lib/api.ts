@@ -214,4 +214,18 @@ export const invoicesApi = {
   delete: async (id: string) => {
     await api.delete(`/invoices/${id}`);
   },
+  getBillable: async (start: string, end: string) => {
+    const { data } = await api.get('/invoices/billable', { params: { start, end } });
+    return data;
+  },
+  generate: async (params: {
+    participantIds: string[];
+    periodStart: string;
+    periodEnd: string;
+    taxRate?: number;
+    dueDays?: number;
+  }) => {
+    const { data } = await api.post('/invoices/generate', params);
+    return data;
+  },
 };

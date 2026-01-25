@@ -90,6 +90,267 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const firstParam = rawFirstParam === '_' ? undefined : rawFirstParam; // '_' is rewrite placeholder for base route
     const secondParam = pathParts[1];
 
+    // /invoices/billable - get billable appointments grouped by participant
+    if (firstParam === 'billable') {
+      if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+      }
+
+      const { start, end } = req.query;
+
+      if (!start || !end) {
+        return res.status(400).json({ error: 'start and end query params required' });
+      }
+
+      const startDate = new Date(start as string);
+      const endDate = new Date(end as string);
+
+      // Get all COMPLETED appointments that are NOT yet invoiced in the period
+      const appointments = await prisma.appointment.findMany({
+        where: {
+          status: 'COMPLETED',
+          invoicedAt: null,
+          startTime: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        include: {
+          trainer: {
+            select: { id: true, name: true, hourlyRate: true },
+          },
+          trainingType: {
+            select: { id: true, name: true, defaultRate: true },
+          },
+          participants: {
+            include: {
+              participant: {
+                select: { id: true, name: true, email: true },
+              },
+            },
+          },
+        },
+        orderBy: { startTime: 'asc' },
+      });
+
+      // Group appointments by participant
+      const participantMap = new Map<string, {
+        id: string;
+        name: string;
+        email: string;
+        appointments: Array<{
+          id: string;
+          date: string;
+          startTime: string;
+          endTime: string;
+          duration: number;
+          trainer: { id: string; name: string; hourlyRate: number | null };
+          trainingType: { id: string; name: string; defaultRate: number | null };
+          rate: number;
+          amount: number;
+        }>;
+        totalMinutes: number;
+        totalAmount: number;
+      }>();
+
+      for (const apt of appointments) {
+        const durationMinutes = Math.round(
+          (new Date(apt.endTime).getTime() - new Date(apt.startTime).getTime()) / 60000
+        );
+
+        // Use trainer hourly rate, fallback to training type default rate
+        const hourlyRate = apt.trainer.hourlyRate
+          ? Number(apt.trainer.hourlyRate)
+          : apt.trainingType.defaultRate
+            ? Number(apt.trainingType.defaultRate)
+            : 0;
+
+        const amount = (durationMinutes / 60) * hourlyRate;
+
+        const aptData = {
+          id: apt.id,
+          date: apt.startTime.toISOString().split('T')[0],
+          startTime: apt.startTime.toISOString().substring(11, 16),
+          endTime: apt.endTime.toISOString().substring(11, 16),
+          duration: durationMinutes,
+          trainer: {
+            id: apt.trainer.id,
+            name: apt.trainer.name,
+            hourlyRate: apt.trainer.hourlyRate ? Number(apt.trainer.hourlyRate) : null,
+          },
+          trainingType: {
+            id: apt.trainingType.id,
+            name: apt.trainingType.name,
+            defaultRate: apt.trainingType.defaultRate ? Number(apt.trainingType.defaultRate) : null,
+          },
+          rate: hourlyRate,
+          amount,
+        };
+
+        // Add to each participant's list
+        for (const p of apt.participants) {
+          const participant = p.participant;
+          if (!participantMap.has(participant.id)) {
+            participantMap.set(participant.id, {
+              id: participant.id,
+              name: participant.name,
+              email: participant.email,
+              appointments: [],
+              totalMinutes: 0,
+              totalAmount: 0,
+            });
+          }
+          const entry = participantMap.get(participant.id)!;
+          entry.appointments.push(aptData);
+          entry.totalMinutes += durationMinutes;
+          entry.totalAmount += amount;
+        }
+      }
+
+      const participants = Array.from(participantMap.values()).map((p) => ({
+        ...p,
+        totalHours: p.totalMinutes / 60,
+      }));
+
+      // Calculate summary
+      const summary = {
+        totalParticipants: participants.length,
+        totalHours: participants.reduce((sum, p) => sum + p.totalHours, 0),
+        totalAmount: participants.reduce((sum, p) => sum + p.totalAmount, 0),
+      };
+
+      return res.json({ participants, summary });
+    }
+
+    // /invoices/generate - generate invoices for selected appointments
+    if (firstParam === 'generate') {
+      if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+      }
+
+      const generateSchema = z.object({
+        participantIds: z.array(z.string()).min(1),
+        periodStart: z.string(),
+        periodEnd: z.string(),
+        taxRate: z.number().default(21),
+        dueDays: z.number().default(14),
+      });
+
+      const data = generateSchema.parse(req.body);
+
+      const startDate = new Date(data.periodStart);
+      const endDate = new Date(data.periodEnd);
+      const dueDate = new Date(Date.now() + data.dueDays * 24 * 60 * 60 * 1000);
+
+      const createdInvoices = [];
+
+      for (const participantId of data.participantIds) {
+        // Get billable appointments for this participant
+        const appointments = await prisma.appointment.findMany({
+          where: {
+            status: 'COMPLETED',
+            invoicedAt: null,
+            startTime: {
+              gte: startDate,
+              lte: endDate,
+            },
+            participants: {
+              some: { participantId },
+            },
+          },
+          include: {
+            trainer: {
+              select: { hourlyRate: true },
+            },
+            trainingType: {
+              select: { name: true, defaultRate: true },
+            },
+          },
+          orderBy: { startTime: 'asc' },
+        });
+
+        if (appointments.length === 0) continue;
+
+        // Calculate amounts
+        const items = appointments.map((apt) => {
+          const durationMinutes = Math.round(
+            (new Date(apt.endTime).getTime() - new Date(apt.startTime).getTime()) / 60000
+          );
+          const hourlyRate = apt.trainer.hourlyRate
+            ? Number(apt.trainer.hourlyRate)
+            : apt.trainingType.defaultRate
+              ? Number(apt.trainingType.defaultRate)
+              : 0;
+          const hours = durationMinutes / 60;
+          const amount = hours * hourlyRate;
+
+          const dateStr = apt.startTime.toISOString().split('T')[0];
+          const description = `${apt.trainingType.name} - ${dateStr} (${hours.toFixed(1)}u)`;
+
+          return {
+            description,
+            quantity: hours,
+            unitPrice: hourlyRate,
+            amount,
+            appointmentId: apt.id,
+          };
+        });
+
+        const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+        const taxAmount = subtotal * (data.taxRate / 100);
+        const total = subtotal + taxAmount;
+
+        const invoiceNumber = await generateInvoiceNumber();
+
+        // Create the invoice
+        const invoice = await prisma.invoice.create({
+          data: {
+            invoiceNumber,
+            participantId,
+            createdById: authUser.id,
+            dueDate,
+            subtotal,
+            taxRate: data.taxRate,
+            taxAmount,
+            discount: 0,
+            total,
+            items: {
+              create: items.map((item) => ({
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                amount: item.amount,
+                appointmentId: item.appointmentId,
+              })),
+            },
+          },
+          include: {
+            participant: {
+              select: { id: true, name: true, email: true },
+            },
+            items: true,
+          },
+        });
+
+        // Mark appointments as invoiced
+        await prisma.appointment.updateMany({
+          where: {
+            id: { in: appointments.map((a) => a.id) },
+          },
+          data: {
+            invoicedAt: new Date(),
+          },
+        });
+
+        createdInvoices.push(invoice);
+      }
+
+      return res.status(201).json({
+        count: createdInvoices.length,
+        invoices: createdInvoices,
+      });
+    }
+
     // /invoices/stats - get invoice statistics
     if (firstParam === 'stats') {
       if (req.method !== 'GET') {
