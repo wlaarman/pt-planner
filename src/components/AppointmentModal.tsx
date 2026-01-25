@@ -100,6 +100,21 @@ export default function AppointmentModal({
     },
   });
 
+  // Reset edit mode when modal closes or appointment changes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset when modal closes
+      setEditMode(null);
+      setShowEditModeChoice(false);
+    }
+  }, [isOpen]);
+
+  // Reset edit mode when switching to a different appointment
+  useEffect(() => {
+    setEditMode(null);
+    setShowEditModeChoice(false);
+  }, [editingAppointment?.id]);
+
   // Initialize form when modal opens
   useEffect(() => {
     if (isOpen) {
