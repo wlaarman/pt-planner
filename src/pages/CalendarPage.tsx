@@ -853,14 +853,17 @@ export default function CalendarPage() {
             {/* Time column */}
             <div className="w-12 lg:w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50">
               {viewMode === 'week' && <div className="h-12 lg:h-14 border-b border-gray-200" />}
-              {HOURS.map((hour) => (
-                <div
-                  key={hour}
-                  className="h-[60px] text-right pr-2 text-xs text-gray-400 -mt-2"
-                >
-                  {hour}:00
-                </div>
-              ))}
+              <div className="relative" style={{ height: `${HOURS.length * 60}px` }}>
+                {HOURS.map((hour, index) => (
+                  <div
+                    key={hour}
+                    className="absolute right-0 pr-2 text-xs text-gray-400 -translate-y-1/2"
+                    style={{ top: `${index * 60}px` }}
+                  >
+                    {hour}:00
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Days */}

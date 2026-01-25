@@ -115,38 +115,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       const { start, end, trainerId } = req.query;
 
-      const where: Record<string, unknown> = {};
-
-      if (start && end) {
-        where.startTime = {
-          gte: new Date(start as string),
-          lte: new Date(end as string),
-        };
-      }
-
-      if (trainerId) {
-        where.trainerId = trainerId;
-      }
-
-      const appointments = await prisma.appointment.findMany({
-        where,
-        include: {
-          trainer: {
-            select: { id: true, name: true, color: true, hourlyRate: true },
-          },
-          trainingType: {
-            select: { id: true, name: true, maxParticipants: true, defaultRate: true, icon: true, color: true },
-          },
-          participants: {
-            include: {
-              participant: {
-                select: { id: true, name: true, email: true },
-              },
+      const includeConfig = {
+        trainer: {
+          select: { id: true, name: true, color: true, hourlyRate: true },
+        },
+        trainingType: {
+          select: { id: true, name: true, maxParticipants: true, defaultRate: true, icon: true, color: true },
+        },
+        participants: {
+          include: {
+            participant: {
+              select: { id: true, name: true, email: true },
             },
           },
         },
-        orderBy: { startTime: 'asc' },
-      });
+      };
+
+      // Build base filter
+      const baseFilter: Record<string, unknown> = {};
+      if (trainerId) {
+        baseFilter.trainerId = trainerId;
+      }
+
+      let appointments;
+
+      if (start && end) {
+        const startDate = new Date(start as string);
+        const endDate = new Date(end as string);
+
+        // Get appointments in the date range OR recurring appointments that started before the range
+        // (so we can expand them to show instances in the current range)
+        appointments = await prisma.appointment.findMany({
+          where: {
+            ...baseFilter,
+            OR: [
+              // Regular appointments within the range
+              {
+                startTime: {
+                  gte: startDate,
+                  lte: endDate,
+                },
+              },
+              // Recurring appointments that started before or within the range
+              // These might have instances that fall within the requested range
+              {
+                isRecurring: true,
+                startTime: {
+                  lte: endDate, // Started before end of range
+                },
+              },
+            ],
+          },
+          include: includeConfig,
+          orderBy: { startTime: 'asc' },
+        });
+      } else {
+        // No date filter - return all
+        appointments = await prisma.appointment.findMany({
+          where: baseFilter,
+          include: includeConfig,
+          orderBy: { startTime: 'asc' },
+        });
+      }
 
       const transformed = appointments.map((apt) => ({
         ...apt,
