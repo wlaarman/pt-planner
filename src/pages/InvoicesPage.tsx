@@ -82,20 +82,25 @@ export default function InvoicesPage() {
   const periodEnd = endOfMonth(selectedMonth);
   const periodLabel = format(selectedMonth, 'MMMM yyyy', { locale: nl });
 
-  const { data: stats } = useQuery<InvoiceStats>({
+  const { data: stats, error: statsError } = useQuery<InvoiceStats>({
     queryKey: ['invoice-stats'],
     queryFn: invoicesApi.getStats,
   });
 
-  const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
+  const { data: invoices = [], isLoading, error: invoicesError } = useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: () => invoicesApi.getAll(),
   });
 
-  const { data: billableData, isLoading: isBillableLoading } = useQuery<BillableData>({
+  const { data: billableData, isLoading: isBillableLoading, error: billableError } = useQuery<BillableData>({
     queryKey: ['billable', periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: () => invoicesApi.getBillable(periodStart.toISOString(), periodEnd.toISOString()),
   });
+
+  // Log errors for debugging
+  if (statsError) console.error('Stats error:', statsError);
+  if (invoicesError) console.error('Invoices error:', invoicesError);
+  if (billableError) console.error('Billable error:', billableError);
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -264,77 +269,80 @@ export default function InvoicesPage() {
                 </td>
               </tr>
             ) : (
-              invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-semibold text-gray-900">
-                    {invoice.invoiceNumber}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {invoice.participant.name}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {format(new Date(invoice.issueDate), 'd MMM yyyy', {
-                      locale: nl,
-                    })}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {format(new Date(invoice.dueDate), 'd MMM yyyy', {
-                      locale: nl,
-                    })}
-                  </td>
-                  <td className="px-6 py-4 text-gray-900">
-                    {formatCurrency(Number(invoice.total))}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={clsx(
-                        'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
-                        statusConfig[invoice.status].className
-                      )}
-                    >
-                      {statusConfig[invoice.status].label}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Bekijken"
+              invoices.map((invoice) => {
+                const statusCfg = statusConfig[invoice.status] || statusConfig.DRAFT;
+                return (
+                  <tr key={invoice.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-semibold text-gray-900">
+                      {invoice.invoiceNumber}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {invoice.participant?.name || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {invoice.issueDate
+                        ? format(new Date(invoice.issueDate), 'd MMM yyyy', { locale: nl })
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {invoice.dueDate
+                        ? format(new Date(invoice.dueDate), 'd MMM yyyy', { locale: nl })
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-gray-900">
+                      {formatCurrency(Number(invoice.total) || 0)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={clsx(
+                          'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
+                          statusCfg.className
+                        )}
                       >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Download PDF"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                      {invoice.status === 'SENT' && (
-                        <button
-                          onClick={() =>
-                            updateStatusMutation.mutate({
-                              id: invoice.id,
-                              status: 'PAID',
-                            })
-                          }
-                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Markeer betaald"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      )}
-                      {invoice.status === 'OVERDUE' && (
+                        {statusCfg.label}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Stuur herinnering"
+                          title="Bekijken"
                         >
-                          <Mail className="w-4 h-4" />
+                          <Eye className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        <button
+                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Download PDF"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        {invoice.status === 'SENT' && (
+                          <button
+                            onClick={() =>
+                              updateStatusMutation.mutate({
+                                id: invoice.id,
+                                status: 'PAID',
+                              })
+                            }
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Markeer betaald"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        )}
+                        {invoice.status === 'OVERDUE' && (
+                          <button
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Stuur herinnering"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
