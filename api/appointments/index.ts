@@ -96,6 +96,7 @@ const appointmentSchema = z.object({
   participantIds: z.array(z.string()).min(1),
   isRecurring: z.boolean().default(false),
   recurrenceRule: z.string().optional(),
+  recurrenceEndDate: z.string().datetime().optional(),
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -237,6 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           trainingTypeId: data.trainingTypeId,
           isRecurring: data.isRecurring,
           recurrenceRule: data.recurrenceRule,
+          recurrenceEndDate: data.recurrenceEndDate ? new Date(data.recurrenceEndDate) : null,
           participants: {
             create: data.participantIds.map((participantId) => ({
               participantId,

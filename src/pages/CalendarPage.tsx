@@ -57,6 +57,7 @@ interface Appointment {
   endTime: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
+  recurrenceEndDate?: string;
   recurrenceId?: string;
   trainer: { id: string; name: string; color: string };
   trainingType: { id: string; name: string; icon: string; color: string };
@@ -109,12 +110,23 @@ function expandRecurringAppointments(
     const aptEnd = new Date(apt.endTime);
     const duration = aptEnd.getTime() - aptStart.getTime();
 
+    // Determine end date for recurrence
+    const recurrenceEnd = apt.recurrenceEndDate
+      ? new Date(apt.recurrenceEndDate)
+      : null;
+
     // Generate instances within the range
     let currentStart = new Date(aptStart);
     let instanceCount = 0;
-    const maxInstances = 52; // Limit to 1 year of weekly instances
+    // If no end date specified, limit to 2 years max for safety
+    const maxInstances = recurrenceEnd ? 500 : 104;
 
     while (currentStart <= rangeEnd && instanceCount < maxInstances) {
+      // Stop if we've passed the recurrence end date
+      if (recurrenceEnd && currentStart > recurrenceEnd) {
+        break;
+      }
+
       const currentEnd = new Date(currentStart.getTime() + duration);
 
       // Check if this instance falls within the visible range

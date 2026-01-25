@@ -13,6 +13,7 @@ interface EditingAppointment {
   notes?: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
+  recurrenceEndDate?: string;
   trainer: { id: string };
   trainingType: { id: string };
   participants: { id: string }[];
@@ -48,6 +49,7 @@ export default function AppointmentModal({
   const [notes, setNotes] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState('weekly');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
   const [error, setError] = useState('');
   const [participantSearch, setParticipantSearch] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -111,6 +113,7 @@ export default function AppointmentModal({
         setNotes(editingAppointment.notes || '');
         setIsRecurring(editingAppointment.isRecurring || false);
         setRecurrenceRule(editingAppointment.recurrenceRule || 'weekly');
+        setRecurrenceEndDate(editingAppointment.recurrenceEndDate ? format(new Date(editingAppointment.recurrenceEndDate), 'yyyy-MM-dd') : '');
       } else {
         // New appointment
         if (initialData?.date) {
@@ -145,6 +148,7 @@ export default function AppointmentModal({
     setNotes('');
     setIsRecurring(false);
     setRecurrenceRule('weekly');
+    setRecurrenceEndDate('');
     setError('');
     setParticipantSearch('');
     setTouched({});
@@ -175,6 +179,7 @@ export default function AppointmentModal({
       notes: notes || undefined,
       isRecurring,
       recurrenceRule: isRecurring ? recurrenceRule : undefined,
+      recurrenceEndDate: isRecurring && recurrenceEndDate ? new Date(recurrenceEndDate).toISOString() : undefined,
     };
 
     if (editingAppointment) {
@@ -446,16 +451,23 @@ export default function AppointmentModal({
                   )}
                 </div>
 
-                <div className="grid grid-cols-5 gap-2">
-                  <div className="col-span-2">
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
-                    />
-                  </div>
-                  <div className="col-span-1">
+                {/* Date field - full width on mobile */}
+                <div>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {format(new Date(date), 'EEEE d MMMM yyyy', { locale: nl })}
+                  </p>
+                </div>
+
+                {/* Time fields */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Van</label>
                     <select
                       value={startTime}
                       onChange={(e) => {
@@ -469,7 +481,7 @@ export default function AppointmentModal({
                         }
                       }}
                       className={clsx(
-                        "w-full px-2 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
                         touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
                       )}
                     >
@@ -480,10 +492,9 @@ export default function AppointmentModal({
                       ))}
                     </select>
                   </div>
-                  <div className="flex items-center justify-center text-gray-400">
-                    →
-                  </div>
-                  <div className="col-span-1">
+                  <div className="text-gray-400 pt-5">→</div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Tot</label>
                     <select
                       value={endTime}
                       onChange={(e) => {
@@ -491,7 +502,7 @@ export default function AppointmentModal({
                         setTouched(t => ({ ...t, time: true }));
                       }}
                       className={clsx(
-                        "w-full px-2 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
                         touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
                       )}
                     >
@@ -503,15 +514,10 @@ export default function AppointmentModal({
                     </select>
                   </div>
                 </div>
-
-                {/* Formatted date preview */}
-                <p className="text-xs text-gray-500">
-                  {format(new Date(date), 'EEEE d MMMM yyyy', { locale: nl })}
-                </p>
               </div>
 
               {/* Recurrence */}
-              <div className="bg-gray-50 rounded-lg p-3">
+              <div className="bg-gray-50 rounded-lg p-3 space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -522,16 +528,38 @@ export default function AppointmentModal({
                   <span className="text-sm font-medium text-gray-700">Herhalende afspraak</span>
                 </label>
                 {isRecurring && (
-                  <select
-                    value={recurrenceRule}
-                    onChange={(e) => setRecurrenceRule(e.target.value)}
-                    className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm bg-white"
-                  >
-                    <option value="daily">Dagelijks</option>
-                    <option value="weekly">Wekelijks</option>
-                    <option value="biweekly">Om de week</option>
-                    <option value="monthly">Maandelijks</option>
-                  </select>
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Herhaling</label>
+                        <select
+                          value={recurrenceRule}
+                          onChange={(e) => setRecurrenceRule(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm bg-white"
+                        >
+                          <option value="daily">Dagelijks</option>
+                          <option value="weekly">Wekelijks</option>
+                          <option value="biweekly">Om de week</option>
+                          <option value="monthly">Maandelijks</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Tot en met</label>
+                        <input
+                          type="date"
+                          value={recurrenceEndDate}
+                          onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                          min={date}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm bg-white"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {recurrenceEndDate
+                        ? `Herhaalt ${recurrenceRule === 'daily' ? 'dagelijks' : recurrenceRule === 'weekly' ? 'wekelijks' : recurrenceRule === 'biweekly' ? 'om de week' : 'maandelijks'} tot ${format(new Date(recurrenceEndDate), 'd MMMM yyyy', { locale: nl })}`
+                        : 'Geen einddatum ingesteld - herhaalt onbeperkt'}
+                    </p>
+                  </>
                 )}
               </div>
 

@@ -86,7 +86,8 @@ model Appointment {
 
   // Recurrence
   isRecurring     Boolean   @default(false)
-  recurrenceRule  String?   // RRULE format
+  recurrenceRule  String?   // RRULE format (daily, weekly, biweekly, monthly)
+  recurrenceEndDate DateTime? // End date for recurring appointments
   recurrenceId    String?   // Parent appointment ID for recurring series
 
   // Google Calendar sync
