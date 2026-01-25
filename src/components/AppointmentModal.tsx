@@ -14,6 +14,7 @@ interface EditingAppointment {
   isRecurring?: boolean;
   recurrenceRule?: string;
   recurrenceEndDate?: string;
+  recurrenceId?: string; // Original appointment ID for recurring instances
   trainer: { id: string };
   trainingType: { id: string };
   participants: { id: string }[];
@@ -53,6 +54,8 @@ export default function AppointmentModal({
   const [error, setError] = useState('');
   const [participantSearch, setParticipantSearch] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [editMode, setEditMode] = useState<'single' | 'series' | null>(null);
+  const [showEditModeChoice, setShowEditModeChoice] = useState(false);
 
   const { data: trainingTypes = [], isLoading: loadingTypes } = useQuery({
     queryKey: ['training-types'],
@@ -102,6 +105,12 @@ export default function AppointmentModal({
     if (isOpen) {
       // If editing, load existing appointment data
       if (editingAppointment) {
+        // Show choice dialog for recurring appointments
+        if (editingAppointment.isRecurring && !editMode) {
+          setShowEditModeChoice(true);
+          return; // Don't load form data yet
+        }
+
         const start = new Date(editingAppointment.startTime);
         const end = new Date(editingAppointment.endTime);
         setDate(format(start, 'yyyy-MM-dd'));
@@ -111,9 +120,17 @@ export default function AppointmentModal({
         setSelectedTrainer(editingAppointment.trainer.id);
         setSelectedParticipants(editingAppointment.participants.map(p => p.id));
         setNotes(editingAppointment.notes || '');
-        setIsRecurring(editingAppointment.isRecurring || false);
-        setRecurrenceRule(editingAppointment.recurrenceRule || 'weekly');
-        setRecurrenceEndDate(editingAppointment.recurrenceEndDate ? format(new Date(editingAppointment.recurrenceEndDate), 'yyyy-MM-dd') : '');
+
+        // For single instance edit, don't show recurrence options
+        if (editMode === 'single') {
+          setIsRecurring(false);
+          setRecurrenceRule('weekly');
+          setRecurrenceEndDate('');
+        } else {
+          setIsRecurring(editingAppointment.isRecurring || false);
+          setRecurrenceRule(editingAppointment.recurrenceRule || 'weekly');
+          setRecurrenceEndDate(editingAppointment.recurrenceEndDate ? format(new Date(editingAppointment.recurrenceEndDate), 'yyyy-MM-dd') : '');
+        }
       } else {
         // New appointment
         if (initialData?.date) {
@@ -136,7 +153,7 @@ export default function AppointmentModal({
         }
       }
     }
-  }, [isOpen, initialData, editingAppointment, trainingTypes, trainers]);
+  }, [isOpen, initialData, editingAppointment, editMode, trainingTypes, trainers]);
 
   const resetForm = () => {
     setSelectedType('');
@@ -152,6 +169,8 @@ export default function AppointmentModal({
     setError('');
     setParticipantSearch('');
     setTouched({});
+    setEditMode(null);
+    setShowEditModeChoice(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -183,7 +202,14 @@ export default function AppointmentModal({
     };
 
     if (editingAppointment) {
-      updateMutation.mutate({ id: editingAppointment.id, data: appointmentData });
+      if (editMode === 'single') {
+        // Create a new standalone appointment for this single instance
+        createMutation.mutate(appointmentData);
+      } else {
+        // Update the series - use recurrenceId if this is a virtual instance
+        const originalId = editingAppointment.recurrenceId || editingAppointment.id;
+        updateMutation.mutate({ id: originalId, data: appointmentData });
+      }
     } else {
       createMutation.mutate(appointmentData);
     }
@@ -265,15 +291,48 @@ export default function AppointmentModal({
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Edit mode choice for recurring appointments */}
+          {showEditModeChoice && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Dit is een herhalende afspraak. Wat wil je bewerken?
+              </p>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditMode('single');
+                    setShowEditModeChoice(false);
+                  }}
+                  className="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                >
+                  <p className="font-medium text-gray-900">Alleen deze afspraak</p>
+                  <p className="text-sm text-gray-500">Maak een uitzondering voor alleen dit moment</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditMode('series');
+                    setShowEditModeChoice(false);
+                  }}
+                  className="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                >
+                  <p className="font-medium text-gray-900">Alle afspraken in de reeks</p>
+                  <p className="text-sm text-gray-500">Wijzig de herhalende afspraak en alle toekomstige momenten</p>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Loading State */}
-          {isLoading && (
+          {!showEditModeChoice && isLoading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
               <span className="ml-2 text-gray-500">Laden...</span>
             </div>
           )}
 
-          {!isLoading && (
+          {!showEditModeChoice && !isLoading && (
             <>
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
@@ -437,8 +496,8 @@ export default function AppointmentModal({
                 </div>
               </div>
 
-              {/* Date and Time */}
-              <div className="space-y-3">
+              {/* Date and Time - compact single row */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-sm font-medium text-gray-700">
                     Datum & Tijd *
@@ -451,68 +510,49 @@ export default function AppointmentModal({
                   )}
                 </div>
 
-                {/* Date field - full width on mobile */}
-                <div>
+                <div className="flex items-center gap-1.5">
                   <input
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+                    className="flex-[2] min-w-0 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    {format(new Date(date), 'EEEE d MMMM yyyy', { locale: nl })}
-                  </p>
-                </div>
-
-                {/* Time fields */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-500 mb-1">Van</label>
-                    <select
-                      value={startTime}
-                      onChange={(e) => {
-                        setStartTime(e.target.value);
-                        setTouched(t => ({ ...t, time: true }));
-                        // Auto-update end time
-                        const [h, m] = e.target.value.split(':').map(Number);
-                        const endHour = h + 1;
-                        if (endHour <= 21) {
-                          setEndTime(`${endHour.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-                        }
-                      }}
-                      className={clsx(
-                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
-                        touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
-                      )}
-                    >
-                      {TIME_OPTIONS.map((time) => (
-                        <option key={time} value={time}>
-                          {time}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="text-gray-400 pt-5">→</div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-500 mb-1">Tot</label>
-                    <select
-                      value={endTime}
-                      onChange={(e) => {
-                        setEndTime(e.target.value);
-                        setTouched(t => ({ ...t, time: true }));
-                      }}
-                      className={clsx(
-                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
-                        touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
-                      )}
-                    >
-                      {TIME_OPTIONS.map((time) => (
-                        <option key={time} value={time}>
-                          {time}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={startTime}
+                    onChange={(e) => {
+                      setStartTime(e.target.value);
+                      setTouched(t => ({ ...t, time: true }));
+                      const [h, m] = e.target.value.split(':').map(Number);
+                      const endHour = h + 1;
+                      if (endHour <= 21) {
+                        setEndTime(`${endHour.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                      }
+                    }}
+                    className={clsx(
+                      "flex-1 min-w-0 px-1.5 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
+                      touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
+                    )}
+                  >
+                    {TIME_OPTIONS.map((time) => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 text-sm">-</span>
+                  <select
+                    value={endTime}
+                    onChange={(e) => {
+                      setEndTime(e.target.value);
+                      setTouched(t => ({ ...t, time: true }));
+                    }}
+                    className={clsx(
+                      "flex-1 min-w-0 px-1.5 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
+                      touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
+                    )}
+                  >
+                    {TIME_OPTIONS.map((time) => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -585,18 +625,23 @@ export default function AppointmentModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors font-medium"
+            className={clsx(
+              "px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors font-medium",
+              showEditModeChoice ? "flex-1" : "flex-1"
+            )}
           >
             Annuleren
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={createMutation.isPending || updateMutation.isPending || isLoading}
-            className="flex-1 px-4 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 active:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
-          >
-            {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
-            {editingAppointment ? 'Bijwerken' : 'Opslaan'}
-          </button>
+          {!showEditModeChoice && (
+            <button
+              onClick={handleSubmit}
+              disabled={createMutation.isPending || updateMutation.isPending || isLoading}
+              className="flex-1 px-4 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 active:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
+              {editingAppointment ? (editMode === 'single' ? 'Opslaan als nieuwe' : 'Bijwerken') : 'Opslaan'}
+            </button>
+          )}
         </div>
       </div>
     </div>
