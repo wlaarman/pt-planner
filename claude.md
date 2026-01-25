@@ -103,6 +103,52 @@ Belangrijke modellen:
 
 ## Known Issues / TODOs
 - Google Calendar OAuth is nog niet geïmplementeerd (iCal werkt wel)
+- **InvoicesPage blank scherm bug** - Na laden wordt pagina blank door error `Cannot read properties of undefined (reading 'totalParticipants')`. Fix is gepusht maar user moet hard refresh doen (Ctrl+Shift+R) of wachten tot Vercel deployment klaar is. Null checks toegevoegd in `src/pages/InvoicesPage.tsx`.
+
+## Recent Toegevoegd (januari 2026)
+
+### Facturatie Feature
+Nieuwe functionaliteit voor het genereren van facturen per periode:
+
+**Database wijzigingen:**
+- `invoicedAt` veld toegevoegd aan Appointment model (tracks wanneer gefactureerd)
+
+**Nieuwe API endpoints:**
+- `GET /api/invoices/billable?start=&end=` - Haalt factureerbare afspraken op (status=COMPLETED, nog niet gefactureerd), gegroepeerd per deelnemer
+- `POST /api/invoices/generate` - Genereert facturen voor geselecteerde deelnemers, markeert afspraken als gefactureerd
+
+**Nieuwe componenten:**
+- `src/components/InvoiceGeneratorModal.tsx` - Modal voor factuur generatie met:
+  - Overzicht per deelnemer met checkbox
+  - Uitklapbare details per afspraak
+  - BTW tarief selectie (0%, 9%, 21%)
+  - Vervaldatum selectie (7, 14, 30 dagen)
+
+**InvoicesPage updates:**
+- Maand-picker toegevoegd (standaard vorige maand)
+- Factureerbaar overzicht (uren, deelnemers, bedrag)
+- "Facturen Genereren" knop
+
+**Flow:**
+1. Selecteer periode (maand)
+2. Bekijk factureerbare uren
+3. Klik "Facturen Genereren"
+4. Selecteer/deselecteer deelnemers
+5. Genereer facturen
+6. Afspraken worden gemarkeerd met `invoicedAt`
+
+**Let op:** Alleen afspraken met status `COMPLETED` worden meegenomen.
+
+### Kalender verbeteringen
+- Time label alignment fix (was cumulative drift door -mt-2)
+- Recurring appointments tonen in toekomstige weken
+- `recurrenceEndDate` veld voor einddatum herhalende afspraken
+- Keuze bij bewerken herhalende afspraak: "Alleen deze" of "Hele reeks"
+
+### Appointment Modal verbeteringen
+- Edit functionaliteit toegevoegd
+- Compacte datum/tijd layout op mobiel
+- Reset van edit mode state bij sluiten modal
 
 ## Taal
 De applicatie is in het **Nederlands**.
