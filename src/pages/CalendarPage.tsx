@@ -55,6 +55,9 @@ interface Appointment {
   id: string;
   startTime: string;
   endTime: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  recurrenceId?: string;
   trainer: { id: string; name: string; color: string };
   trainingType: { id: string; name: string; icon: string; color: string };
   participants: { id: string; name: string; email: string }[];
@@ -66,6 +69,81 @@ interface ICalEvent {
   startTime: string;
   endTime: string;
   isExternal: true;
+}
+
+// Expand recurring appointments into virtual instances
+function expandRecurringAppointments(
+  appointments: Appointment[],
+  rangeStart: Date,
+  rangeEnd: Date
+): Appointment[] {
+  const expanded: Appointment[] = [];
+
+  for (const apt of appointments) {
+    if (!apt.isRecurring || !apt.recurrenceRule) {
+      // Non-recurring appointment - add as-is
+      expanded.push(apt);
+      continue;
+    }
+
+    // Calculate interval in days based on recurrence rule
+    let intervalDays: number;
+    switch (apt.recurrenceRule) {
+      case 'daily':
+        intervalDays = 1;
+        break;
+      case 'weekly':
+        intervalDays = 7;
+        break;
+      case 'biweekly':
+        intervalDays = 14;
+        break;
+      case 'monthly':
+        intervalDays = 30; // Approximate
+        break;
+      default:
+        intervalDays = 7;
+    }
+
+    const aptStart = new Date(apt.startTime);
+    const aptEnd = new Date(apt.endTime);
+    const duration = aptEnd.getTime() - aptStart.getTime();
+
+    // Generate instances within the range
+    let currentStart = new Date(aptStart);
+    let instanceCount = 0;
+    const maxInstances = 52; // Limit to 1 year of weekly instances
+
+    while (currentStart <= rangeEnd && instanceCount < maxInstances) {
+      const currentEnd = new Date(currentStart.getTime() + duration);
+
+      // Check if this instance falls within the visible range
+      if (currentEnd >= rangeStart && currentStart <= rangeEnd) {
+        // First instance keeps original id, subsequent get derived ids
+        const instanceId = instanceCount === 0 ? apt.id : `${apt.id}-rec-${instanceCount}`;
+
+        expanded.push({
+          ...apt,
+          id: instanceId,
+          startTime: currentStart.toISOString(),
+          endTime: currentEnd.toISOString(),
+          recurrenceId: apt.id, // Reference to original
+        });
+      }
+
+      // Move to next occurrence
+      if (apt.recurrenceRule === 'monthly') {
+        // For monthly, add actual month
+        currentStart = new Date(currentStart);
+        currentStart.setMonth(currentStart.getMonth() + 1);
+      } else {
+        currentStart = new Date(currentStart.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+      }
+      instanceCount++;
+    }
+  }
+
+  return expanded;
 }
 
 // Draggable Appointment Component
@@ -246,6 +324,7 @@ export default function CalendarPage() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [createInitialData, setCreateInitialData] = useState<{ date?: Date; startTime?: string } | null>(null);
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
 
@@ -325,10 +404,32 @@ export default function CalendarPage() {
     },
   });
 
+  // Initialize selected trainers when trainers load
+  useMemo(() => {
+    if (trainers.length > 0 && selectedTrainers.length === 0) {
+      setSelectedTrainers(trainers.map((t: any) => t.id));
+    }
+  }, [trainers]);
+
+  // Days to display based on view mode (not screen size)
+  const days = viewMode === 'day'
+    ? [currentDate] // Single day view
+    : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Week view
+
+  // Expand recurring appointments within the visible range
+  const expandedAppointments = useMemo(() => {
+    return expandRecurringAppointments(appointments, weekStart, weekEnd);
+  }, [appointments, weekStart, weekEnd]);
+
+  const filteredAppointments = expandedAppointments.filter(
+    (apt) =>
+      selectedTrainers.length === 0 || selectedTrainers.includes(apt.trainer.id)
+  );
+
   // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const apt = appointments.find((a) => a.id === active.id);
+    const apt = filteredAppointments.find((a) => a.id === active.id);
     if (apt) {
       setActiveAppointment(apt);
     }
@@ -347,8 +448,11 @@ export default function CalendarPage() {
     const dayIndex = parseInt(match[1], 10);
     const hour = parseInt(match[2], 10);
 
-    const apt = appointments.find((a) => a.id === active.id);
+    const apt = filteredAppointments.find((a) => a.id === active.id);
     if (!apt) return;
+
+    // For recurring instances, get the original appointment ID
+    const appointmentId = apt.recurrenceId || apt.id;
 
     // Calculate new times
     const oldStart = new Date(apt.startTime);
@@ -362,8 +466,10 @@ export default function CalendarPage() {
 
     // Only update if time actually changed
     if (newStart.getTime() !== oldStart.getTime()) {
+      // Note: Moving a recurring instance will update the original appointment
+      // This might not be the desired behavior for all cases
       updateAppointmentMutation.mutate({
-        id: apt.id,
+        id: appointmentId,
         startTime: newStart.toISOString(),
         endTime: newEnd.toISOString(),
       });
@@ -373,23 +479,6 @@ export default function CalendarPage() {
   const handleDragCancel = () => {
     setActiveAppointment(null);
   };
-
-  // Initialize selected trainers when trainers load
-  useMemo(() => {
-    if (trainers.length > 0 && selectedTrainers.length === 0) {
-      setSelectedTrainers(trainers.map((t: any) => t.id));
-    }
-  }, [trainers]);
-
-  // Days to display based on view mode (not screen size)
-  const days = viewMode === 'day'
-    ? [currentDate] // Single day view
-    : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Week view
-
-  const filteredAppointments = appointments.filter(
-    (apt) =>
-      selectedTrainers.length === 0 || selectedTrainers.includes(apt.trainer.id)
-  );
 
   const toggleTrainer = (trainerId: string) => {
     setSelectedTrainers((prev) =>
@@ -565,6 +654,7 @@ export default function CalendarPage() {
   const handleTimeSlotClick = (day: Date, hour: number) => {
     const startTime = `${hour.toString().padStart(2, '0')}:00`;
     setCreateInitialData({ date: day, startTime });
+    setEditingAppointment(null);
     setIsCreateModalOpen(true);
   };
 
@@ -649,6 +739,7 @@ export default function CalendarPage() {
           <button
             onClick={() => {
               setCreateInitialData(null);
+              setEditingAppointment(null);
               setIsCreateModalOpen(true);
             }}
             className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 active:bg-primary-700 transition-colors"
@@ -883,21 +974,27 @@ export default function CalendarPage() {
         onClose={() => {
           setIsCreateModalOpen(false);
           setCreateInitialData(null);
+          setEditingAppointment(null);
         }}
         onSuccess={() => {
           refetchAppointments();
           setIsCreateModalOpen(false);
           setCreateInitialData(null);
+          setEditingAppointment(null);
         }}
         initialData={createInitialData}
+        editingAppointment={editingAppointment}
       />
 
       <AppointmentDetailModal
         appointment={selectedAppointment}
         onClose={() => setSelectedAppointment(null)}
         onEdit={() => {
-          // TODO: Open edit modal
-          setSelectedAppointment(null);
+          if (selectedAppointment) {
+            setEditingAppointment(selectedAppointment);
+            setIsCreateModalOpen(true);
+            setSelectedAppointment(null);
+          }
         }}
         onDelete={() => {
           refetchAppointments();
