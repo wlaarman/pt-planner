@@ -145,12 +145,12 @@ export default function InvoicesPage() {
           {/* Billable Summary */}
           {isBillableLoading ? (
             <div className="text-sm text-gray-500">Laden...</div>
-          ) : billableData && billableData.summary.totalParticipants > 0 ? (
+          ) : billableData?.summary?.totalParticipants && billableData.summary.totalParticipants > 0 ? (
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="w-4 h-4 text-primary-500" />
                 <span className="text-gray-600">
-                  {billableData.summary.totalHours.toFixed(1)} uur
+                  {(billableData.summary.totalHours || 0).toFixed(1)} uur
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -162,7 +162,7 @@ export default function InvoicesPage() {
               <div className="flex items-center gap-2 text-sm">
                 <Calculator className="w-4 h-4 text-primary-500" />
                 <span className="font-semibold text-gray-900">
-                  {formatCurrency(billableData.summary.totalAmount)}
+                  {formatCurrency(billableData.summary.totalAmount || 0)}
                 </span>
               </div>
               <button
