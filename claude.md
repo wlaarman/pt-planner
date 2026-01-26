@@ -34,6 +34,9 @@ PT Planner is een agenda-applicatie voor personal trainers om afspraken te beher
   /reports              # Rapportages
   /trainers             # Trainers
   /training-types       # Training types
+/lib                    # Shared utilities (NOT in /api to avoid being deployed as functions)
+  auth.ts               # Auth helpers
+  prisma.ts             # Prisma client singleton
 /prisma
   schema.prisma         # Database schema
   seed.ts               # Demo data
@@ -104,6 +107,40 @@ Belangrijke modellen:
 ## Known Issues / TODOs
 - Google Calendar OAuth is nog niet geïmplementeerd (iCal werkt wel)
 - **InvoicesPage blank scherm bug** - Na laden wordt pagina blank door error `Cannot read properties of undefined (reading 'totalParticipants')`. Fix is gepusht maar user moet hard refresh doen (Ctrl+Shift+R) of wachten tot Vercel deployment klaar is. Null checks toegevoegd in `src/pages/InvoicesPage.tsx`.
+
+### ACTIEF PROBLEEM: Invoices Billable Endpoint Werkt Niet (26 jan 2026)
+
+**Symptoom:**
+- `GET /api/invoices/billable` retourneert `[]` in plaats van de verwachte JSON met participants en summary
+- Alle sub-routes onder `/api/invoices/` (billable, stats, debug) retourneren de response van de base route (`[]` = alle invoices)
+- Dit suggereert dat de route params NIET worden doorgegeven aan de catch-all handler
+
+**Wat is geprobeerd:**
+1. Environment variables toegevoegd aan Vercel (DATABASE_URL, DIRECT_URL, JWT_SECRET) - dit was nodig, functies werkten niet zonder
+2. Demo user wachtwoord gereset naar `trainer123` - werkt nu
+3. `api/lib/` verplaatst naar `/lib/` - deze werden als functions geteld en namen function slots in
+4. Debug endpoint `/api/invoices/debug` toegevoegd - retourneert ook `[]`, wordt niet bereikt
+
+**Wat NIET het probleem is:**
+- Database: er zijn 38 januari afspraken in de database, allemaal SCHEDULED en niet gefactureerd
+- Authentication: login werkt, token is geldig
+- Deployment: `api/invoices/[[...params]]` wordt correct gebuild (7.42MB)
+- Function limit: na verplaatsen van lib files zijn er nu genoeg slots
+
+**Vermoedelijke oorzaak:**
+De `req.query['...params']` retourneert `undefined` voor routes zoals `/api/invoices/billable`. Dit kan zijn:
+- Vercel catch-all routing werkt anders dan verwacht voor `[[...params]]` (optional catch-all)
+- Er is een conflict met de rewrite regel in vercel.json
+
+**Debug info toegevoegd:**
+- Console.log statements in `api/invoices/[[...params]].ts` (regel 87-100)
+- `/api/invoices/debug` endpoint toegevoegd die req.query info zou moeten retourneren
+
+**Volgende stappen om te proberen:**
+1. Check Vercel function logs voor de debug output
+2. Probeer file te hernoemen naar `[...params].ts` (required catch-all) ipv `[[...params]].ts` (optional)
+3. Maak een aparte `billable.ts` file voor de billable endpoint
+4. Controleer of de vercel.json rewrite regel het probleem veroorzaakt
 
 ## Recent Toegevoegd (januari 2026)
 
