@@ -102,6 +102,11 @@ export default function InvoicesPage() {
   if (invoicesError) console.error('Invoices error:', invoicesError);
   if (billableError) console.error('Billable error:', billableError);
 
+  // Safe accessors for billable data to prevent crashes
+  const hasBillableData = !!(billableData?.participants && billableData?.summary);
+  const billableSummary = hasBillableData ? billableData.summary : { totalParticipants: 0, totalHours: 0, totalAmount: 0 };
+  const hasParticipants = billableSummary.totalParticipants > 0;
+
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       invoicesApi.updateStatus(id, status),
@@ -145,24 +150,28 @@ export default function InvoicesPage() {
           {/* Billable Summary */}
           {isBillableLoading ? (
             <div className="text-sm text-gray-500">Laden...</div>
-          ) : billableData?.summary?.totalParticipants && billableData.summary.totalParticipants > 0 ? (
+          ) : billableError ? (
+            <div className="text-sm text-red-500">
+              Fout bij laden factureerbare data
+            </div>
+          ) : hasParticipants ? (
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="w-4 h-4 text-primary-500" />
                 <span className="text-gray-600">
-                  {(billableData.summary.totalHours || 0).toFixed(1)} uur
+                  {billableSummary.totalHours.toFixed(1)} uur
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Users className="w-4 h-4 text-primary-500" />
                 <span className="text-gray-600">
-                  {billableData.summary.totalParticipants} deelnemers
+                  {billableSummary.totalParticipants} deelnemers
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Calculator className="w-4 h-4 text-primary-500" />
                 <span className="font-semibold text-gray-900">
-                  {formatCurrency(billableData.summary.totalAmount || 0)}
+                  {formatCurrency(billableSummary.totalAmount)}
                 </span>
               </div>
               <button
