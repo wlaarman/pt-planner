@@ -105,10 +105,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const startDate = new Date(start as string);
       const endDate = new Date(end as string);
 
-      // Get all COMPLETED appointments that are NOT yet invoiced in the period
+      // Get all appointments in the period that are NOT yet invoiced
+      // Include SCHEDULED and COMPLETED, exclude CANCELLED and NO_SHOW
       const appointments = await prisma.appointment.findMany({
         where: {
-          status: 'COMPLETED',
+          status: { in: ['SCHEDULED', 'COMPLETED'] },
           invoicedAt: null,
           startTime: {
             gte: startDate,
@@ -309,7 +310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Get billable appointments for this participant
         const appointments = await prisma.appointment.findMany({
           where: {
-            status: 'COMPLETED',
+            status: { in: ['SCHEDULED', 'COMPLETED'] },
             invoicedAt: null,
             startTime: {
               gte: startDate,

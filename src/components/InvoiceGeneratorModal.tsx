@@ -156,7 +156,7 @@ export default function InvoiceGeneratorModal({
               <Clock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
               <p>Geen factureerbare afspraken gevonden voor deze periode.</p>
               <p className="text-sm mt-2">
-                Let op: alleen afgeronde afspraken worden getoond.
+                Let op: geannuleerde afspraken worden niet getoond.
               </p>
             </div>
           ) : (

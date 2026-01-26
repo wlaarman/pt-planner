@@ -174,7 +174,7 @@ export default function InvoicesPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
         <div className="p-4 border-b border-gray-200">
           <h2 className="font-semibold text-gray-900">Te factureren uren</h2>
-          <p className="text-sm text-gray-500">Afgeronde afspraken die nog niet gefactureerd zijn</p>
+          <p className="text-sm text-gray-500">Afspraken die nog niet gefactureerd zijn</p>
         </div>
 
         {isBillableLoading ? (
