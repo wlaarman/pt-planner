@@ -198,12 +198,12 @@ export default function InvoicesPage() {
           </div>
           <div className="flex-1">
             <p className="text-2xl font-bold text-gray-900">
-              {stats?.open.count || 0}
+              {stats?.open?.count ?? 0}
             </p>
             <p className="text-sm text-gray-500">Open facturen</p>
           </div>
           <p className="text-lg font-semibold text-gray-600">
-            {formatCurrency(stats?.open.total || 0)}
+            {formatCurrency(stats?.open?.total ?? 0)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
@@ -212,12 +212,12 @@ export default function InvoicesPage() {
           </div>
           <div className="flex-1">
             <p className="text-2xl font-bold text-gray-900">
-              {stats?.paid.count || 0}
+              {stats?.paid?.count ?? 0}
             </p>
             <p className="text-sm text-gray-500">Betaalde facturen</p>
           </div>
           <p className="text-lg font-semibold text-gray-600">
-            {formatCurrency(stats?.paid.total || 0)}
+            {formatCurrency(stats?.paid?.total ?? 0)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
@@ -226,12 +226,12 @@ export default function InvoicesPage() {
           </div>
           <div className="flex-1">
             <p className="text-2xl font-bold text-gray-900">
-              {stats?.overdue.count || 0}
+              {stats?.overdue?.count ?? 0}
             </p>
             <p className="text-sm text-gray-500">Te laat</p>
           </div>
           <p className="text-lg font-semibold text-gray-600">
-            {formatCurrency(stats?.overdue.total || 0)}
+            {formatCurrency(stats?.overdue?.total ?? 0)}
           </p>
         </div>
       </div>
