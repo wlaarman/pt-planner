@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const params = req.query.params;
+    const params = req.query['...params'];
     const rawAction = Array.isArray(params) ? params[0] : params;
     const action = rawAction === '_' ? undefined : rawAction; // '_' is rewrite placeholder for base route
 
