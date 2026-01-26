@@ -207,16 +207,77 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      const participants = Array.from(participantMap.values()).map((p) => ({
-        ...p,
-        totalHours: p.totalMinutes / 60,
+      // Group by training type within each participant
+      const participants = Array.from(participantMap.values()).map((p) => {
+        // Group appointments by training type
+        const byTypeMap = new Map<string, {
+          trainingType: { id: string; name: string; defaultRate: number | null };
+          appointments: typeof p.appointments;
+          totalMinutes: number;
+          totalAmount: number;
+        }>();
+
+        for (const apt of p.appointments) {
+          const typeId = apt.trainingType.id;
+          if (!byTypeMap.has(typeId)) {
+            byTypeMap.set(typeId, {
+              trainingType: apt.trainingType,
+              appointments: [],
+              totalMinutes: 0,
+              totalAmount: 0,
+            });
+          }
+          const entry = byTypeMap.get(typeId)!;
+          entry.appointments.push(apt);
+          entry.totalMinutes += apt.duration;
+          entry.totalAmount += apt.amount;
+        }
+
+        const byTrainingType = Array.from(byTypeMap.values()).map((t) => ({
+          ...t,
+          totalHours: t.totalMinutes / 60,
+        }));
+
+        return {
+          ...p,
+          totalHours: p.totalMinutes / 60,
+          byTrainingType,
+        };
+      });
+
+      // Calculate summary with training type breakdown
+      const summaryByTypeMap = new Map<string, {
+        trainingType: { id: string; name: string };
+        totalMinutes: number;
+        totalAmount: number;
+      }>();
+
+      for (const p of participants) {
+        for (const t of p.byTrainingType) {
+          const typeId = t.trainingType.id;
+          if (!summaryByTypeMap.has(typeId)) {
+            summaryByTypeMap.set(typeId, {
+              trainingType: { id: t.trainingType.id, name: t.trainingType.name },
+              totalMinutes: 0,
+              totalAmount: 0,
+            });
+          }
+          const entry = summaryByTypeMap.get(typeId)!;
+          entry.totalMinutes += t.totalMinutes;
+          entry.totalAmount += t.totalAmount;
+        }
+      }
+
+      const byTrainingType = Array.from(summaryByTypeMap.values()).map((t) => ({
+        ...t,
+        totalHours: t.totalMinutes / 60,
       }));
 
-      // Calculate summary
       const summary = {
         totalParticipants: participants.length,
         totalHours: participants.reduce((sum, p) => sum + p.totalHours, 0),
         totalAmount: participants.reduce((sum, p) => sum + p.totalAmount, 0),
+        byTrainingType,
       };
 
       return res.json({ participants, summary });

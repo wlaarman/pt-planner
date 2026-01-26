@@ -16,11 +16,20 @@ interface BillableAppointment {
   amount: number;
 }
 
+interface TrainingTypeGroup {
+  trainingType: { id: string; name: string; defaultRate?: number | null };
+  appointments: BillableAppointment[];
+  totalMinutes: number;
+  totalHours: number;
+  totalAmount: number;
+}
+
 interface BillableParticipant {
   id: string;
   name: string;
   email: string;
   appointments: BillableAppointment[];
+  byTrainingType: TrainingTypeGroup[];
   totalMinutes: number;
   totalHours: number;
   totalAmount: number;
@@ -32,6 +41,11 @@ interface BillableData {
     totalParticipants: number;
     totalHours: number;
     totalAmount: number;
+    byTrainingType?: Array<{
+      trainingType: { id: string; name: string };
+      totalHours: number;
+      totalAmount: number;
+    }>;
   };
 }
 
@@ -179,9 +193,13 @@ export default function InvoiceGeneratorModal({
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{participant.name}</p>
-                            <p className="text-sm text-gray-500">
-                              {participant.appointments.length} afspraken
-                            </p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {participant.byTrainingType?.map((t) => (
+                                <span key={t.trainingType.id} className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  {t.trainingType.name}: {t.totalHours.toFixed(1)}u
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -202,25 +220,36 @@ export default function InvoiceGeneratorModal({
                       </button>
                     </div>
 
-                    {/* Expanded appointments */}
+                    {/* Expanded - grouped by training type */}
                     {isExpanded && (
-                      <div className="border-t border-gray-200 px-4 py-3 space-y-2">
-                        {participant.appointments.map((apt) => (
-                          <div
-                            key={apt.id}
-                            className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-white/50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-gray-500 w-20">{apt.date}</span>
-                              <span className="text-gray-700">{apt.trainingType.name}</span>
-                              <span className="text-gray-400">
-                                {apt.startTime} - {apt.endTime}
+                      <div className="border-t border-gray-200 px-4 py-3 space-y-4">
+                        {participant.byTrainingType?.map((typeGroup) => (
+                          <div key={typeGroup.trainingType.id}>
+                            <div className="flex items-center justify-between mb-2 pb-1 border-b border-gray-100">
+                              <span className="text-sm font-medium text-gray-700">
+                                {typeGroup.trainingType.name}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-700">
+                                {typeGroup.totalHours.toFixed(1)}u - {formatCurrency(typeGroup.totalAmount)}
                               </span>
                             </div>
-                            <div className="flex items-center gap-4 text-gray-600">
-                              <span>{formatDuration(apt.duration)}</span>
-                              <span className="w-20 text-right">{formatCurrency(apt.amount)}</span>
-                            </div>
+                            {typeGroup.appointments.map((apt) => (
+                              <div
+                                key={apt.id}
+                                className="flex items-center justify-between text-sm py-1 px-2 rounded hover:bg-white/50"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="text-gray-500 w-20">{apt.date}</span>
+                                  <span className="text-gray-400">
+                                    {apt.startTime} - {apt.endTime}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-gray-600">
+                                  <span>{formatDuration(apt.duration)}</span>
+                                  <span className="w-20 text-right">{formatCurrency(apt.amount)}</span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
