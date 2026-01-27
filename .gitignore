@@ -43,6 +43,10 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+~$*
+
+# Documentation
+requirements.docx
 
 .vercel
 .env*.local
