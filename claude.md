@@ -15,7 +15,7 @@ PT Planner is een agenda-applicatie voor personal trainers om afspraken te beher
 
 ## Deployment
 - **Hosting:** Vercel
-- **URL:** https://personaltrainer-psi.vercel.app
+- **URL:** https://pt-planner.vercel.app
 - **BELANGRIJK:** Vercel is gekoppeld aan de GitHub repo. Deployments gebeuren automatisch via git push, NIET via `npx vercel --prod`. Commit en push wijzigingen om te deployen.
 - **GitHub repo:** https://github.com/wlaarman/pt-planner
 
