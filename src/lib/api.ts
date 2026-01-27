@@ -214,8 +214,11 @@ export const invoicesApi = {
   delete: async (id: string) => {
     await api.delete(`/invoices/${id}`);
   },
-  getBillable: async (start: string, end: string) => {
-    const { data } = await api.get('/invoices/billable', { params: { start, end } });
+  getBillable: async (start: string, end: string, trainerId?: string, participantId?: string) => {
+    const params: Record<string, string> = { start, end };
+    if (trainerId) params.trainerId = trainerId;
+    if (participantId) params.participantId = participantId;
+    const { data } = await api.get('/invoices/billable', { params });
     return data;
   },
   generate: async (params: {

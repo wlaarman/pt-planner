@@ -6,8 +6,7 @@ import CalendarPage from './pages/CalendarPage';
 import TrainersPage from './pages/TrainersPage';
 import ParticipantsPage from './pages/ParticipantsPage';
 import TrainingTypesPage from './pages/TrainingTypesPage';
-import ReportsPage from './pages/ReportsPage';
-import InvoicesPage from './pages/InvoicesPage';
+import OverzichtPage from './pages/OverzichtPage';
 import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,8 +34,7 @@ function App() {
                 <Route path="/trainers" element={<TrainersPage />} />
                 <Route path="/participants" element={<ParticipantsPage />} />
                 <Route path="/training-types" element={<TrainingTypesPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/invoices" element={<InvoicesPage />} />
+                <Route path="/overzicht" element={<OverzichtPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </Layout>

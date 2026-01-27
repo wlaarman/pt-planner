@@ -7,7 +7,6 @@ import {
   UserCog,
   List,
   BarChart3,
-  FileText,
   Settings,
   LogOut,
   Dumbbell,
@@ -21,8 +20,7 @@ const navItems = [
   { to: '/trainers', label: 'Trainers', icon: UserCog },
   { to: '/participants', label: 'Deelnemers', icon: Users },
   { to: '/training-types', label: 'Types', icon: List },
-  { to: '/reports', label: 'Rapportage', icon: BarChart3 },
-  { to: '/invoices', label: 'Facturatie', icon: FileText },
+  { to: '/overzicht', label: 'Overzicht', icon: BarChart3 },
   { to: '/settings', label: 'Instellingen', icon: Settings },
 ];
 

@@ -97,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' });
       }
 
-      const { start, end } = req.query;
+      const { start, end, trainerId, participantId } = req.query;
 
       if (!start || !end) {
         return res.status(400).json({ error: 'start and end query params required' });
@@ -106,17 +106,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const startDate = new Date(start as string);
       const endDate = new Date(end as string);
 
+      // Build where clause with optional filters
+      const where: Record<string, unknown> = {
+        status: { in: ['SCHEDULED', 'COMPLETED'] },
+        invoicedAt: null,
+        startTime: {
+          gte: startDate,
+          lte: endDate,
+        },
+      };
+
+      // Filter by trainer if specified
+      if (trainerId) {
+        where.trainerId = trainerId as string;
+      }
+
+      // Filter by participant if specified
+      if (participantId) {
+        where.participants = {
+          some: { participantId: participantId as string },
+        };
+      }
+
       // Get all appointments in the period that are NOT yet invoiced
       // Include SCHEDULED and COMPLETED, exclude CANCELLED and NO_SHOW
       const appointments = await prisma.appointment.findMany({
-        where: {
-          status: { in: ['SCHEDULED', 'COMPLETED'] },
-          invoicedAt: null,
-          startTime: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
+        where,
         include: {
           trainer: {
             select: { id: true, name: true, hourlyRate: true },
