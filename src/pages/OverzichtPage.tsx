@@ -202,10 +202,15 @@ export default function OverzichtPage() {
             <h1 className="text-xl lg:text-2xl font-semibold text-gray-900">Overzicht</h1>
             <p className="text-sm text-gray-500 mt-1">Bekijk en factureer trainingsuren</p>
           </div>
-          {eboekhoudenStatus?.connected && (
+          {eboekhoudenStatus?.connected ? (
             <div className="flex items-center gap-2 text-sm text-green-600">
               <CheckCircle className="w-4 h-4" />
               <span>e-Boekhouden verbonden</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-amber-600">
+              <AlertCircle className="w-4 h-4" />
+              <span>e-Boekhouden niet verbonden</span>
             </div>
           )}
         </div>
