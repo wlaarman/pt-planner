@@ -232,3 +232,28 @@ export const invoicesApi = {
     return data;
   },
 };
+
+// e-Boekhouden API
+export const eboekhoudenApi = {
+  getStatus: async () => {
+    const { data } = await api.get('/eboekhouden/status');
+    return data;
+  },
+  getRelations: async () => {
+    const { data } = await api.get('/eboekhouden/relations');
+    return data;
+  },
+  getLedgers: async () => {
+    const { data } = await api.get('/eboekhouden/ledgers');
+    return data;
+  },
+  sendInvoice: async (invoiceId: string, relationId: number, templateId?: number, ledgerId?: number) => {
+    const { data } = await api.post('/eboekhouden/send-invoice', {
+      invoiceId,
+      relationId,
+      templateId,
+      ledgerId,
+    });
+    return data;
+  },
+};
