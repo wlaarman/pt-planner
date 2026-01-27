@@ -128,35 +128,86 @@ const params = req.query['[...params]'] || req.query['[[...params]]'] || req.que
 
 ## Recent Toegevoegd (januari 2026)
 
+### Overzicht Pagina (merged Rapportage + Facturatie)
+Samenvoeging van Rapportage en Facturatie in één mobiel-vriendelijke "Overzicht" pagina:
+
+**Route:** `/overzicht`
+
+**Features:**
+- Tabs: "Te factureren" en "Facturen"
+- Filters: maand-picker, trainer dropdown, deelnemer dropdown
+- "Toon Resultaten" knop om data op te halen (voorkomt onnodige API calls)
+- Summary cards: sessies, uren, totaalbedrag
+- Uitklapbare deelnemerskaarten met details per trainingstype
+- e-Boekhouden verbindingsstatus indicator
+
+**Bestanden:**
+- `src/pages/OverzichtPage.tsx` - Nieuwe gecombineerde pagina
+- `src/pages/ReportsPage.tsx` - Verwijderd
+- `src/pages/InvoicesPage.tsx` - Verwijderd (vervangen door OverzichtPage)
+- `src/App.tsx` - Routes aangepast naar `/overzicht`
+- `src/components/Layout.tsx` - Navigatie aangepast
+
+### e-Boekhouden Integratie
+Koppeling met e-Boekhouden boekhoudpakket:
+
+**Environment variable (Vercel):**
+```
+EBOEKHOUDEN_ACCESS_TOKEN=<token>
+```
+
+**API endpoints:**
+- `GET /api/eboekhouden/status` - Connectie status checken
+- `GET /api/eboekhouden/relations` - Relaties ophalen
+- `GET /api/eboekhouden/ledgers` - Grootboekrekeningen ophalen
+- `POST /api/eboekhouden/send-invoice` - Factuur versturen naar e-Boekhouden
+
+**Frontend:**
+- Connectie status in header (groen = verbonden, oranje = niet verbonden)
+- "Versturen" knop bij facturen in Facturen tab
+- Modal voor relatie selectie bij versturen
+
+**Bestanden:**
+- `api/eboekhouden/[[...params]].ts` - API endpoint
+- `src/lib/api.ts` - Frontend API client (eboekhoudenApi)
+
+### ACTIEF PROBLEEM: e-Boekhouden Invoice Versturen (27 jan 2026)
+
+**Symptoom:** Blank scherm na klikken op "Verstuur naar e-Boekhouden"
+
+**Wat is opgelost:**
+1. Prisma Decimal vergelijking bug - `invoice.taxRate === 0` werkte niet, nu `Number(invoice.taxRate) === 0`
+2. Validatie toegevoegd: check of factuur items heeft
+3. Betere error logging toegevoegd in backend
+
+**Nog te testen:**
+- Fix is gepusht (commit 44795e5), wachten op Vercel deployment
+- Check browser console (F12) voor foutmeldingen
+- Check Vercel function logs voor backend errors
+
+**Mogelijke oorzaken:**
+- e-Boekhouden API kan vereiste velden missen (relationId format, templateId, ledgerId)
+- Response parsing errors
+
 ### Facturatie Feature
-Nieuwe functionaliteit voor het genereren van facturen per periode:
+Functionaliteit voor het genereren van facturen per periode:
 
 **Database wijzigingen:**
 - `invoicedAt` veld toegevoegd aan Appointment model (tracks wanneer gefactureerd)
 
-**Nieuwe API endpoints:**
-- `GET /api/invoices/billable?start=&end=` - Haalt factureerbare afspraken op (status=COMPLETED, nog niet gefactureerd), gegroepeerd per deelnemer
-- `POST /api/invoices/generate` - Genereert facturen voor geselecteerde deelnemers, markeert afspraken als gefactureerd
-
-**Nieuwe componenten:**
-- `src/components/InvoiceGeneratorModal.tsx` - Modal voor factuur generatie met:
-  - Overzicht per deelnemer met checkbox
-  - Uitklapbare details per afspraak
-  - BTW tarief selectie (0%, 9%, 21%)
-  - Vervaldatum selectie (7, 14, 30 dagen)
-
-**InvoicesPage updates:**
-- Maand-picker toegevoegd (standaard vorige maand)
-- Factureerbaar overzicht (uren, deelnemers, bedrag)
-- "Facturen Genereren" knop
+**API endpoints:**
+- `GET /api/invoices/billable?start=&end=&trainerId=&participantId=` - Haalt factureerbare afspraken op, gegroepeerd per deelnemer
+- `POST /api/invoices/generate` - Genereert facturen voor geselecteerde deelnemers
 
 **Flow:**
 1. Selecteer periode (maand)
-2. Bekijk factureerbare uren
-3. Klik "Facturen Genereren"
-4. Selecteer/deselecteer deelnemers
-5. Genereer facturen
-6. Afspraken worden gemarkeerd met `invoicedAt`
+2. Optioneel: filter op trainer/deelnemer
+3. Klik "Toon Resultaten"
+4. Bekijk factureerbare uren
+5. Klik "Facturen Genereren"
+6. Selecteer/deselecteer deelnemers
+7. Genereer facturen
+8. Verstuur naar e-Boekhouden
 
 **Let op:** Alleen afspraken met status `COMPLETED` worden meegenomen.
 
