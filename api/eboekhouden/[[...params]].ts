@@ -178,16 +178,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // GET /eboekhouden/status - Check connection status
     if (firstParam === 'status' && req.method === 'GET') {
+      const tokenLength = EBOEKHOUDEN_ACCESS_TOKEN ? EBOEKHOUDEN_ACCESS_TOKEN.length : 0;
+      const tokenPreview = EBOEKHOUDEN_ACCESS_TOKEN ? EBOEKHOUDEN_ACCESS_TOKEN.substring(0, 5) + '...' : 'none';
+
       if (!EBOEKHOUDEN_ACCESS_TOKEN) {
-        return res.json({ connected: false, error: 'API token not configured' });
+        return res.json({
+          connected: false,
+          error: 'API token not configured',
+          debug: { tokenLength, tokenPreview, envKeys: Object.keys(process.env).filter(k => k.includes('EBOEK')) }
+        });
       }
 
       const sessionToken = await createEboekhoudenSession();
       if (!sessionToken) {
-        return res.json({ connected: false, error: 'Could not connect to e-Boekhouden' });
+        return res.json({
+          connected: false,
+          error: 'Could not connect to e-Boekhouden',
+          debug: { tokenLength, tokenPreview }
+        });
       }
 
-      return res.json({ connected: true });
+      return res.json({ connected: true, debug: { tokenLength, tokenPreview } });
     }
 
     // GET /eboekhouden/relations - Get relations from e-Boekhouden
