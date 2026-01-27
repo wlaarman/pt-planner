@@ -148,6 +148,7 @@ export default function OverzichtPage() {
   });
 
   // Send to e-Boekhouden mutation
+  const [sendError, setSendError] = useState<string | null>(null);
   const sendToEboekhoudenMutation = useMutation({
     mutationFn: (params: { invoiceId: string; relationId: number }) =>
       eboekhoudenApi.sendInvoice(params.invoiceId, params.relationId),
@@ -155,6 +156,11 @@ export default function OverzichtPage() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       setSendToEboekhoudenModal(null);
       setSelectedRelationId('');
+      setSendError(null);
+    },
+    onError: (error: any) => {
+      console.error('e-Boekhouden send error:', error);
+      setSendError(error?.response?.data?.error || error?.message || 'Onbekende fout');
     },
   });
 
@@ -546,7 +552,10 @@ export default function OverzichtPage() {
 
                         {!isSentToEboekhouden && eboekhoudenStatus?.connected && (
                           <button
-                            onClick={() => setSendToEboekhoudenModal(invoice)}
+                            onClick={() => {
+                              setSendError(null);
+                              setSendToEboekhoudenModal(invoice);
+                            }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
                           >
                             <Send className="w-4 h-4" />
@@ -615,6 +624,14 @@ export default function OverzichtPage() {
                   <strong>Bedrag:</strong> {formatCurrency(Number(sendToEboekhoudenModal.total) || 0)}
                 </p>
               </div>
+
+              {(sendError || sendToEboekhoudenMutation.isError) && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    <strong>Fout:</strong> {sendError || 'Er ging iets mis bij het versturen'}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="p-4 border-t border-gray-200 flex gap-3 justify-end">
