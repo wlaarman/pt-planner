@@ -83,29 +83,43 @@ async function sendInvoiceToEboekhouden(
   }
 ): Promise<{ success: boolean; invoiceNumber?: string; error?: string }> {
   try {
+    const requestBody = {
+      relationId: invoice.relationId,
+      termOfPayment: invoice.termOfPayment,
+      templateId: invoice.templateId,
+      inExVat: 'EX', // Prices excluding VAT
+      reference: invoice.reference,
+      items: invoice.items,
+    };
+
+    console.log('e-Boekhouden invoice request:', JSON.stringify(requestBody, null, 2));
+
     const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/invoice`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': sessionToken,
       },
-      body: JSON.stringify({
-        relationId: invoice.relationId,
-        termOfPayment: invoice.termOfPayment,
-        templateId: invoice.templateId,
-        inExVat: 'EX', // Prices excluding VAT
-        reference: invoice.reference,
-        items: invoice.items,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    const responseText = await response.text();
+    console.log('e-Boekhouden invoice response:', response.status, responseText);
+
     if (!response.ok) {
-      const error = await response.text();
-      console.error('e-Boekhouden invoice error:', error);
-      return { success: false, error };
+      // Try to parse error message from response
+      let errorMessage = responseText;
+      try {
+        const errorJson = JSON.parse(responseText);
+        errorMessage = errorJson.message || errorJson.error || responseText;
+      } catch {
+        // Keep raw text if not JSON
+      }
+      console.error('e-Boekhouden invoice error:', errorMessage);
+      return { success: false, error: errorMessage };
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
     return { success: true, invoiceNumber: data.invoiceNumber };
   } catch (error) {
     console.error('e-Boekhouden invoice error:', error);
@@ -256,6 +270,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: 'Invoice not found' });
       }
 
+      // Check if invoice has items
+      if (!invoice.items || invoice.items.length === 0) {
+        return res.status(400).json({ error: 'Invoice has no items to send' });
+      }
+
+      console.log('Sending invoice to e-Boekhouden:', {
+        invoiceId,
+        relationId,
+        itemCount: invoice.items.length,
+        taxRate: Number(invoice.taxRate),
+      });
+
       // Create session
       const sessionToken = await createEboekhoudenSession();
       if (!sessionToken) {
@@ -263,11 +289,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Map invoice items to e-Boekhouden format
+      const taxRateNum = Number(invoice.taxRate);
+      const vatCode = taxRateNum === 0 ? 'GEEN' : taxRateNum === 9 ? 'LAAG_VERK' : 'HOOG_VERK';
+
       const items = invoice.items.map((item) => ({
         description: item.description,
         quantity: Number(item.quantity),
         pricePerUnit: Number(item.unitPrice),
-        vatCode: invoice.taxRate === 0 ? 'GEEN' : invoice.taxRate === 9 ? 'LAAG_VERK' : 'HOOG_VERK',
+        vatCode: vatCode,
         ledgerId: ledgerId,
       }));
 
