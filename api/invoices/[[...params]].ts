@@ -84,32 +84,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Debug: log entire query object to understand params
-    console.log('DEBUG invoices handler:', {
-      url: req.url,
-      query: req.query,
-      method: req.method
-    });
-
-    const params = req.query['...params'];
+    // Vercel passes catch-all params with brackets in the key: '[...params]' or '[[...params]]'
+    const params = req.query['[...params]'] || req.query['[[...params]]'] || req.query['...params'];
     const pathParts = Array.isArray(params) ? params : params ? [params] : [];
     const rawFirstParam = pathParts[0];
     const firstParam = rawFirstParam === '_' ? undefined : rawFirstParam; // '_' is rewrite placeholder for base route
     const secondParam = pathParts[1];
-
-    console.log('DEBUG params:', { params, pathParts, rawFirstParam, firstParam, secondParam });
-
-    // /invoices/debug - return query info for debugging
-    if (firstParam === 'debug') {
-      return res.json({
-        url: req.url,
-        query: req.query,
-        params,
-        pathParts,
-        firstParam,
-        secondParam
-      });
-    }
 
     // /invoices/billable - get billable appointments grouped by participant
     if (firstParam === 'billable') {
