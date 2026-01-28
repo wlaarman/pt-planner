@@ -200,18 +200,20 @@ async function getEboekhoudenRelations(sessionToken: string): Promise<any[]> {
 }
 
 // Get invoice templates from e-Boekhouden
-async function getEboekhoudenTemplates(sessionToken: string): Promise<any[]> {
+async function getEboekhoudenTemplates(sessionToken: string): Promise<{ templates: any[], debug: any }> {
+  const debugInfo: any = { tried: [], responses: [] };
+
   // Try multiple possible endpoints
   const endpoints = [
     '/v1/invoicetemplate',
-    '/v1/invoice-template',
+    '/v1/invoicetemplate?limit=100',
+    '/v1/invoice/template',
     '/v1/template',
-    '/v1/factuursjabloon',
+    '/v1/templates',
   ];
 
   for (const endpoint of endpoints) {
     try {
-      console.log('Trying templates endpoint:', endpoint);
       const response = await fetch(`${EBOEKHOUDEN_API_URL}${endpoint}`, {
         method: 'GET',
         headers: {
@@ -220,10 +222,15 @@ async function getEboekhoudenTemplates(sessionToken: string): Promise<any[]> {
       });
 
       const responseText = await response.text();
-      console.log(`e-Boekhouden ${endpoint} response:`, response.status, responseText.substring(0, 500));
+      debugInfo.tried.push(endpoint);
+      debugInfo.responses.push({
+        endpoint,
+        status: response.status,
+        body: responseText.substring(0, 300)
+      });
 
       if (!response.ok) {
-        continue; // Try next endpoint
+        continue;
       }
 
       const data = JSON.parse(responseText);
@@ -238,17 +245,15 @@ async function getEboekhoudenTemplates(sessionToken: string): Promise<any[]> {
       }
 
       if (templates.length > 0) {
-        console.log('Templates found at', endpoint, ':', templates.length);
-        return templates;
+        return { templates, debug: debugInfo };
       }
     } catch (error) {
-      console.log(`Endpoint ${endpoint} failed:`, error);
+      debugInfo.responses.push({ endpoint, error: String(error) });
       continue;
     }
   }
 
-  console.log('No templates found at any endpoint');
-  return [];
+  return { templates: [], debug: debugInfo };
 }
 
 // Get ledger accounts from e-Boekhouden
@@ -353,8 +358,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: 'Could not connect to e-Boekhouden' });
       }
 
-      const templates = await getEboekhoudenTemplates(sessionToken);
-      return res.json(templates);
+      const { templates, debug } = await getEboekhoudenTemplates(sessionToken);
+      return res.json({ templates, debug });
     }
 
     // POST /eboekhouden/send-invoice - Send an invoice to e-Boekhouden
@@ -404,7 +409,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // If no templateId provided, try to fetch available templates
       if (!templateId) {
-        const templates = await getEboekhoudenTemplates(sessionToken);
+        const { templates } = await getEboekhoudenTemplates(sessionToken);
         if (templates.length > 0) {
           templateId = templates[0].id;
           console.log('Using first available template:', templateId, templates[0].name || templates[0].description);
