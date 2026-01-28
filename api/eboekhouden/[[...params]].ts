@@ -359,6 +359,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // POST /eboekhouden/send-invoice - Send an invoice to e-Boekhouden
     if (firstParam === 'send-invoice' && req.method === 'POST') {
+      console.log('send-invoice request body:', JSON.stringify(req.body));
       let { invoiceId, relationId, templateId, ledgerId = 8000 } = req.body;
 
       if (!invoiceId) {
@@ -463,6 +464,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(404).json({ error: 'Not found' });
   } catch (error) {
     console.error('e-Boekhouden API error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ error: `Internal server error: ${errorMessage}` });
   }
 }
