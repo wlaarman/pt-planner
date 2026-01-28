@@ -100,6 +100,7 @@ export default function OverzichtPage() {
   // e-Boekhouden modal state
   const [sendToEboekhoudenModal, setSendToEboekhoudenModal] = useState<Invoice | null>(null);
   const [selectedRelationId, setSelectedRelationId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('1');
 
   const periodStart = startOfMonth(selectedMonth);
   const periodEnd = endOfMonth(selectedMonth);
@@ -173,12 +174,13 @@ export default function OverzichtPage() {
   // Send to e-Boekhouden mutation
   const [sendError, setSendError] = useState<string | null>(null);
   const sendToEboekhoudenMutation = useMutation({
-    mutationFn: (params: { invoiceId: string; relationId: number }) =>
-      eboekhoudenApi.sendInvoice(params.invoiceId, params.relationId),
+    mutationFn: (params: { invoiceId: string; relationId: number; templateId: number }) =>
+      eboekhoudenApi.sendInvoice(params.invoiceId, params.relationId, params.templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       setSendToEboekhoudenModal(null);
       setSelectedRelationId('');
+      setSelectedTemplateId('1');
       setSendError(null);
     },
     onError: (error: any) => {
@@ -221,10 +223,11 @@ export default function OverzichtPage() {
   };
 
   const handleSendToEboekhouden = () => {
-    if (!sendToEboekhoudenModal || !selectedRelationId) return;
+    if (!sendToEboekhoudenModal || !selectedRelationId || !selectedTemplateId) return;
     sendToEboekhoudenMutation.mutate({
       invoiceId: sendToEboekhoudenModal.id,
       relationId: parseInt(selectedRelationId),
+      templateId: parseInt(selectedTemplateId),
     });
   };
 
@@ -652,6 +655,23 @@ export default function OverzichtPage() {
                 </select>
               )}
 
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Factuursjabloon ID
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+                  placeholder="Bijv. 1 of 2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Vind dit in e-Boekhouden → Beheer → Factuursjablonen
+                </p>
+              </div>
+
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">
                   <strong>Bedrag:</strong> {formatCurrency(Number(sendToEboekhoudenModal.total) || 0)}
@@ -672,6 +692,7 @@ export default function OverzichtPage() {
                 onClick={() => {
                   setSendToEboekhoudenModal(null);
                   setSelectedRelationId('');
+                  setSelectedTemplateId('1');
                 }}
                 className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -679,7 +700,7 @@ export default function OverzichtPage() {
               </button>
               <button
                 onClick={handleSendToEboekhouden}
-                disabled={!selectedRelationId || sendToEboekhoudenMutation.isPending}
+                disabled={!selectedRelationId || !selectedTemplateId || sendToEboekhoudenMutation.isPending}
                 className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ExternalLink className="w-4 h-4" />
