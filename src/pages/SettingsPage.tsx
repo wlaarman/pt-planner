@@ -104,7 +104,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-4xl">
+    <div className="p-4 lg:p-6 max-w-4xl overflow-x-hidden">
       <header className="mb-4 lg:mb-6">
         <h1 className="text-xl lg:text-2xl font-semibold text-gray-900">Instellingen</h1>
       </header>
@@ -166,12 +166,12 @@ export default function SettingsPage() {
                   </p>
 
                   {isConnected ? (
-                    <div className="mt-3">
+                    <div className="mt-3 overflow-hidden">
                       <span className="text-xs text-green-600 flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" />
                         Verbonden
                       </span>
-                      <p className="text-xs text-gray-400 mt-1 truncate" title={icalSettings?.icalUrl}>
+                      <p className="text-xs text-gray-400 mt-1 truncate max-w-[200px] sm:max-w-xs" title={icalSettings?.icalUrl}>
                         {icalSettings?.icalUrl}
                       </p>
                     </div>
