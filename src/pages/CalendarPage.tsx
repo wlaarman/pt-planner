@@ -728,18 +728,17 @@ export default function CalendarPage() {
 
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
               >
                 Vandaag
               </button>
 
-              {/* Subtle view toggle */}
+              {/* View toggle */}
               <button
                 onClick={() => setViewModeOverride(viewMode === 'day' ? 'week' : 'day')}
-                className="w-7 h-7 text-xs font-medium text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center"
-                title={viewMode === 'day' ? 'Weekweergave' : 'Dagweergave'}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
               >
-                {viewMode === 'day' ? 'W' : 'D'}
+                {viewMode === 'day' ? 'Week' : 'Dag'}
               </button>
             </div>
           </div>
