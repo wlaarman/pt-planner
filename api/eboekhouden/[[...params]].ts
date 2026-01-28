@@ -142,7 +142,25 @@ async function getEboekhoudenRelations(sessionToken: string): Promise<any[]> {
       return [];
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('e-Boekhouden relations response type:', typeof data, Array.isArray(data) ? 'array' : 'not array');
+
+    // Handle different response formats from e-Boekhouden API
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && Array.isArray(data.relations)) {
+      return data.relations;
+    }
+    if (data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    if (data && Array.isArray(data.items)) {
+      return data.items;
+    }
+
+    console.error('Unexpected e-Boekhouden relations format:', JSON.stringify(data).substring(0, 500));
+    return [];
   } catch (error) {
     console.error('e-Boekhouden relations error:', error);
     return [];

@@ -135,11 +135,14 @@ export default function OverzichtPage() {
   });
 
   // Fetch e-Boekhouden relations when modal is open
-  const { data: eboekhoudenRelations = [], isLoading: isLoadingRelations } = useQuery({
+  const { data: eboekhoudenRelationsData, isLoading: isLoadingRelations, error: relationsError } = useQuery({
     queryKey: ['eboekhouden-relations'],
     queryFn: () => eboekhoudenApi.getRelations(),
     enabled: !!sendToEboekhoudenModal,
   });
+
+  // Ensure relations is always an array (defensive against API response format issues)
+  const eboekhoudenRelations = Array.isArray(eboekhoudenRelationsData) ? eboekhoudenRelationsData : [];
 
   // e-Boekhouden connection status
   const { data: eboekhoudenStatus } = useQuery({
@@ -599,6 +602,11 @@ export default function OverzichtPage() {
               </label>
               {isLoadingRelations ? (
                 <div className="text-sm text-gray-500">Relaties laden...</div>
+              ) : relationsError ? (
+                <div className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Fout bij laden relaties: {(relationsError as Error)?.message || 'Onbekende fout'}
+                </div>
               ) : eboekhoudenRelations.length === 0 ? (
                 <div className="text-sm text-amber-600 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
