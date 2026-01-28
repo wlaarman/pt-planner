@@ -19,7 +19,7 @@ import {
   setMinutes,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { appointmentsApi, trainersApi, calendarApi } from '../lib/api';
 import clsx from 'clsx';
 import AppointmentModal from '../components/AppointmentModal';
@@ -743,19 +743,6 @@ export default function CalendarPage() {
               </button>
             </div>
           </div>
-
-          {/* Add button */}
-          <button
-            onClick={() => {
-              setCreateInitialData(null);
-              setEditingAppointment(null);
-              setIsCreateModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 active:bg-primary-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Nieuwe Afspraak</span>
-          </button>
         </div>
 
         {/* Month Picker Dropdown */}
