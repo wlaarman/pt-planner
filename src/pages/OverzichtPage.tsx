@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { invoicesApi, trainersApi, participantsApi, eboekhoudenApi } from '../lib/api';
+import { invoicesApi, eboekhoudenApi } from '../lib/api';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import {
@@ -90,8 +90,6 @@ export default function OverzichtPage() {
 
   // Filter state
   const [selectedMonth, setSelectedMonth] = useState(() => subMonths(new Date(), 1));
-  const [trainerId, setTrainerId] = useState('');
-  const [participantId, setParticipantId] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
@@ -100,32 +98,27 @@ export default function OverzichtPage() {
   // e-Boekhouden modal state
   const [sendToEboekhoudenModal, setSendToEboekhoudenModal] = useState<Invoice | null>(null);
   const [selectedRelationId, setSelectedRelationId] = useState<string>('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('1493701');
-  const [selectedLedgerId, setSelectedLedgerId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
+    return localStorage.getItem('eboekhouden-template-id') || '1493701';
+  });
+  const [selectedLedgerId, setSelectedLedgerId] = useState<string>(() => {
+    return localStorage.getItem('eboekhouden-ledger-id') || '';
+  });
+
+  // Batch selection for invoices
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+  const [batchSendProgress, setBatchSendProgress] = useState<{ current: number; total: number } | null>(null);
 
   const periodStart = startOfMonth(selectedMonth);
   const periodEnd = endOfMonth(selectedMonth);
   const periodLabel = format(selectedMonth, 'MMMM yyyy', { locale: nl });
 
-  // Fetch trainers and participants for filters
-  const { data: trainers = [] } = useQuery({
-    queryKey: ['trainers'],
-    queryFn: trainersApi.getAll,
-  });
-
-  const { data: participants = [] } = useQuery({
-    queryKey: ['participants'],
-    queryFn: () => participantsApi.getAll(),
-  });
-
   // Fetch billable data only when "Toon Resultaten" is clicked
   const { data: billableData, isLoading, refetch } = useQuery<BillableData>({
-    queryKey: ['billable', periodStart.toISOString(), periodEnd.toISOString(), trainerId, participantId],
+    queryKey: ['billable', periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: () => invoicesApi.getBillable(
       periodStart.toISOString(),
-      periodEnd.toISOString(),
-      trainerId || undefined,
-      participantId || undefined
+      periodEnd.toISOString()
     ),
     enabled: showResults,
   });
@@ -241,14 +234,77 @@ export default function OverzichtPage() {
     });
   };
 
-  const handleSendToEboekhouden = () => {
+  const handleSendToEboekhouden = async () => {
     if (!sendToEboekhoudenModal || !selectedRelationId || !selectedTemplateId || !selectedLedgerId) return;
-    sendToEboekhoudenMutation.mutate({
-      invoiceId: sendToEboekhoudenModal.id,
-      relationId: parseInt(selectedRelationId),
-      templateId: parseInt(selectedTemplateId),
-      ledgerId: parseInt(selectedLedgerId),
+    // Save preferences to localStorage
+    localStorage.setItem('eboekhouden-template-id', selectedTemplateId);
+    localStorage.setItem('eboekhouden-ledger-id', selectedLedgerId);
+
+    // Batch send mode
+    if (sendToEboekhoudenModal.id === 'batch') {
+      const invoiceIds = Array.from(selectedInvoices);
+      setBatchSendProgress({ current: 0, total: invoiceIds.length });
+
+      for (let i = 0; i < invoiceIds.length; i++) {
+        try {
+          await eboekhoudenApi.sendInvoice(
+            invoiceIds[i],
+            parseInt(selectedRelationId),
+            parseInt(selectedTemplateId),
+            parseInt(selectedLedgerId)
+          );
+          setBatchSendProgress({ current: i + 1, total: invoiceIds.length });
+        } catch (error: any) {
+          const invoice = invoices.find((inv) => inv.id === invoiceIds[i]);
+          setSendError(`Fout bij factuur ${invoice?.invoiceNumber || invoiceIds[i]}: ${error?.response?.data?.error || error?.message || 'Onbekende fout'}`);
+          setBatchSendProgress(null);
+          return;
+        }
+      }
+
+      // All sent successfully
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setSendToEboekhoudenModal(null);
+      setSelectedRelationId('');
+      setSelectedInvoices(new Set());
+      setBatchSendProgress(null);
+      setSendError(null);
+    } else {
+      // Single invoice mode
+      sendToEboekhoudenMutation.mutate({
+        invoiceId: sendToEboekhoudenModal.id,
+        relationId: parseInt(selectedRelationId),
+        templateId: parseInt(selectedTemplateId),
+        ledgerId: parseInt(selectedLedgerId),
+      });
+    }
+  };
+
+  // Toggle invoice selection for batch send
+  const toggleInvoiceSelection = (invoiceId: string) => {
+    setSelectedInvoices((prev) => {
+      const next = new Set(prev);
+      if (next.has(invoiceId)) {
+        next.delete(invoiceId);
+      } else {
+        next.add(invoiceId);
+      }
+      return next;
     });
+  };
+
+  // Get sendable invoices (not yet in e-Boekhouden)
+  const sendableInvoices = invoices.filter(
+    (inv) => !inv.notes?.includes('e-Boekhouden') && eboekhoudenStatus?.connected
+  );
+
+  // Toggle all sendable invoices
+  const toggleAllInvoices = () => {
+    if (selectedInvoices.size === sendableInvoices.length) {
+      setSelectedInvoices(new Set());
+    } else {
+      setSelectedInvoices(new Set(sendableInvoices.map((inv) => inv.id)));
+    }
   };
 
   return (
@@ -275,74 +331,53 @@ export default function OverzichtPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-5 mb-4 lg:mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          {/* Month Picker */}
-          <div>
+        <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
+          {/* Period Selection */}
+          <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Periode
             </label>
-            <div className="flex items-center">
-              <button
-                onClick={() => handleMonthChange('prev')}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-l-lg border border-r-0 border-gray-300 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="flex-1 px-3 py-2 bg-white border-y border-gray-300 text-center">
-                <span className="text-sm font-medium text-gray-900 capitalize">{periodLabel}</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center flex-1">
+                <button
+                  onClick={() => handleMonthChange('prev')}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-l-lg border border-r-0 border-gray-300 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="flex-1 px-3 py-2 bg-white border-y border-gray-300 text-center">
+                  <span className="text-sm font-medium text-gray-900 capitalize">{periodLabel}</span>
+                </div>
+                <button
+                  onClick={() => handleMonthChange('next')}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-r-lg border border-l-0 border-gray-300 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
+            </div>
+            {/* Quick period buttons */}
+            <div className="flex gap-1 mt-2">
               <button
-                onClick={() => handleMonthChange('next')}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-r-lg border border-l-0 border-gray-300 transition-colors"
+                onClick={() => setSelectedMonth(subMonths(new Date(), 1))}
+                className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
               >
-                <ChevronRight className="w-4 h-4" />
+                Vorige maand
+              </button>
+              <button
+                onClick={() => setSelectedMonth(new Date())}
+                className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              >
+                Deze maand
               </button>
             </div>
-          </div>
-
-          {/* Trainer Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Trainer
-            </label>
-            <select
-              value={trainerId}
-              onChange={(e) => setTrainerId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
-            >
-              <option value="">Alle trainers</option>
-              {trainers.map((t: any) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Participant Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Deelnemer
-            </label>
-            <select
-              value={participantId}
-              onChange={(e) => setParticipantId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
-            >
-              <option value="">Alle deelnemers</option>
-              {participants.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Search Button */}
           <div className="flex items-end">
             <button
               onClick={handleShowResults}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
             >
               <Search className="w-4 h-4" />
               <span>Toon Resultaten</span>
@@ -546,9 +581,34 @@ export default function OverzichtPage() {
       ) : (
         /* Invoices Tab */
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-900">Aangemaakte facturen</h2>
-            <p className="text-sm text-gray-500">Verstuur naar e-Boekhouden voor verdere verwerking</p>
+          <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-gray-900">Aangemaakte facturen</h2>
+              <p className="text-sm text-gray-500">Verstuur naar e-Boekhouden voor verdere verwerking</p>
+            </div>
+            {sendableInvoices.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleAllInvoices}
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  {selectedInvoices.size === sendableInvoices.length ? 'Deselecteer alle' : 'Selecteer alle'}
+                </button>
+                {selectedInvoices.size > 0 && (
+                  <button
+                    onClick={() => {
+                      setSendError(null);
+                      // Open modal for batch send - we'll use a special marker
+                      setSendToEboekhoudenModal({ id: 'batch' } as Invoice);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Verstuur {selectedInvoices.size} facturen</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {isLoadingInvoices ? (
@@ -568,6 +628,14 @@ export default function OverzichtPage() {
                   <div key={invoice.id} className="p-4 hover:bg-gray-50">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
+                        {!isSentToEboekhouden && eboekhoudenStatus?.connected && (
+                          <input
+                            type="checkbox"
+                            checked={selectedInvoices.has(invoice.id)}
+                            onChange={() => toggleInvoiceSelection(invoice.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500 flex-shrink-0"
+                          />
+                        )}
                         <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 flex-shrink-0">
                           <FileText className="w-5 h-5" />
                         </div>
@@ -636,17 +704,23 @@ export default function OverzichtPage() {
       {/* Send to e-Boekhouden Modal */}
       {sendToEboekhoudenModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[85vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900">Verstuur naar e-Boekhouden</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Factuur {sendToEboekhoudenModal.invoiceNumber} voor {sendToEboekhoudenModal.participant?.name}
+                {sendToEboekhoudenModal.id === 'batch'
+                  ? `${selectedInvoices.size} facturen geselecteerd`
+                  : `Factuur ${sendToEboekhoudenModal.invoiceNumber} voor ${sendToEboekhoudenModal.participant?.name}`
+                }
               </p>
             </div>
 
-            <div className="p-4">
+            <div className="p-4 flex-1 overflow-y-auto">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Selecteer relatie in e-Boekhouden
+                {sendToEboekhoudenModal.id === 'batch' && (
+                  <span className="font-normal text-gray-500 ml-1">(voor alle facturen)</span>
+                )}
               </label>
               {isLoadingRelations ? (
                 <div className="text-sm text-gray-500">Relaties laden...</div>
@@ -716,11 +790,35 @@ export default function OverzichtPage() {
                 )}
               </div>
 
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  <strong>Bedrag:</strong> {formatCurrency(Number(sendToEboekhoudenModal.total) || 0)}
-                </p>
-              </div>
+              {sendToEboekhoudenModal.id === 'batch' ? (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Geselecteerde facturen:</p>
+                  {invoices
+                    .filter((inv) => selectedInvoices.has(inv.id))
+                    .map((inv) => (
+                      <div key={inv.id} className="flex justify-between text-sm text-gray-600 py-1">
+                        <span>{inv.invoiceNumber} - {inv.participant?.name}</span>
+                        <span>{formatCurrency(Number(inv.total) || 0)}</span>
+                      </div>
+                    ))}
+                  <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium text-gray-900">
+                    <span>Totaal</span>
+                    <span>
+                      {formatCurrency(
+                        invoices
+                          .filter((inv) => selectedInvoices.has(inv.id))
+                          .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    <strong>Bedrag:</strong> {formatCurrency(Number(sendToEboekhoudenModal.total) || 0)}
+                  </p>
+                </div>
+              )}
 
               {(sendError || sendToEboekhoudenMutation.isError) && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -731,26 +829,49 @@ export default function OverzichtPage() {
               )}
             </div>
 
-            <div className="p-4 border-t border-gray-200 flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setSendToEboekhoudenModal(null);
-                  setSelectedRelationId('');
-                  setSelectedTemplateId('1493701');
-                  setSelectedLedgerId('');
-                }}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={handleSendToEboekhouden}
-                disabled={!selectedRelationId || !selectedTemplateId || !selectedLedgerId || sendToEboekhoudenMutation.isPending}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ExternalLink className="w-4 h-4" />
-                {sendToEboekhoudenMutation.isPending ? 'Versturen...' : 'Verstuur naar e-Boekhouden'}
-              </button>
+            <div className="p-4 border-t border-gray-200 flex-shrink-0">
+              {batchSendProgress && (
+                <div className="mb-3">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Versturen...</span>
+                    <span>{batchSendProgress.current} / {batchSendProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${(batchSendProgress.current / batchSendProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setSendToEboekhoudenModal(null);
+                    setSelectedRelationId('');
+                    setBatchSendProgress(null);
+                  }}
+                  disabled={!!batchSendProgress}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Annuleren
+                </button>
+                <button
+                  onClick={handleSendToEboekhouden}
+                  disabled={!selectedRelationId || !selectedTemplateId || !selectedLedgerId || sendToEboekhoudenMutation.isPending || !!batchSendProgress}
+                  className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {batchSendProgress
+                    ? `Versturen ${batchSendProgress.current}/${batchSendProgress.total}...`
+                    : sendToEboekhoudenMutation.isPending
+                      ? 'Versturen...'
+                      : sendToEboekhoudenModal.id === 'batch'
+                        ? `Verstuur ${selectedInvoices.size} facturen`
+                        : 'Verstuur naar e-Boekhouden'
+                  }
+                </button>
+              </div>
             </div>
           </div>
         </div>
