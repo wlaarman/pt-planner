@@ -201,43 +201,54 @@ async function getEboekhoudenRelations(sessionToken: string): Promise<any[]> {
 
 // Get invoice templates from e-Boekhouden
 async function getEboekhoudenTemplates(sessionToken: string): Promise<any[]> {
-  try {
-    const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/invoicetemplate`, {
-      method: 'GET',
-      headers: {
-        'Authorization': sessionToken,
-      },
-    });
+  // Try multiple possible endpoints
+  const endpoints = [
+    '/v1/invoicetemplate',
+    '/v1/invoice-template',
+    '/v1/template',
+    '/v1/factuursjabloon',
+  ];
 
-    const responseText = await response.text();
-    console.log('e-Boekhouden templates response:', response.status, responseText);
+  for (const endpoint of endpoints) {
+    try {
+      console.log('Trying templates endpoint:', endpoint);
+      const response = await fetch(`${EBOEKHOUDEN_API_URL}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': sessionToken,
+        },
+      });
 
-    if (!response.ok) {
-      console.error('e-Boekhouden templates error:', responseText);
-      return [];
+      const responseText = await response.text();
+      console.log(`e-Boekhouden ${endpoint} response:`, response.status, responseText.substring(0, 500));
+
+      if (!response.ok) {
+        continue; // Try next endpoint
+      }
+
+      const data = JSON.parse(responseText);
+
+      let templates: any[] = [];
+      if (Array.isArray(data)) {
+        templates = data;
+      } else if (data && Array.isArray(data.data)) {
+        templates = data.data;
+      } else if (data && Array.isArray(data.templates)) {
+        templates = data.templates;
+      }
+
+      if (templates.length > 0) {
+        console.log('Templates found at', endpoint, ':', templates.length);
+        return templates;
+      }
+    } catch (error) {
+      console.log(`Endpoint ${endpoint} failed:`, error);
+      continue;
     }
-
-    const data = JSON.parse(responseText);
-
-    if (Array.isArray(data)) {
-      console.log('Templates found:', data.length);
-      return data;
-    }
-    if (data && Array.isArray(data.data)) {
-      console.log('Templates found (data):', data.data.length);
-      return data.data;
-    }
-    if (data && Array.isArray(data.templates)) {
-      console.log('Templates found (templates):', data.templates.length);
-      return data.templates;
-    }
-
-    console.log('Unexpected templates format:', typeof data, JSON.stringify(data).substring(0, 200));
-    return [];
-  } catch (error) {
-    console.error('e-Boekhouden templates error:', error);
-    return [];
   }
+
+  console.log('No templates found at any endpoint');
+  return [];
 }
 
 // Get ledger accounts from e-Boekhouden
