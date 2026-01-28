@@ -621,7 +621,7 @@ export default function OverzichtPage() {
                   <option value="">Selecteer een relatie...</option>
                   {eboekhoudenRelations.map((rel: any) => (
                     <option key={rel.id} value={rel.id}>
-                      {rel.company || rel.name || `Relatie ${rel.id}`}
+                      {rel.company || rel.bedrijf || rel.Bedrijf || rel.name || rel.naam || rel.Naam || rel.code || rel.Code || rel.relatiecode || `Relatie ${rel.id}`}
                     </option>
                   ))}
                 </select>

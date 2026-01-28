@@ -143,26 +143,64 @@ async function getEboekhoudenRelations(sessionToken: string): Promise<any[]> {
     }
 
     const data = await response.json();
-    console.log('e-Boekhouden relations response type:', typeof data, Array.isArray(data) ? 'array' : 'not array');
 
     // Handle different response formats from e-Boekhouden API
+    let relations: any[] = [];
+    if (Array.isArray(data)) {
+      relations = data;
+    } else if (data && Array.isArray(data.relations)) {
+      relations = data.relations;
+    } else if (data && Array.isArray(data.data)) {
+      relations = data.data;
+    } else if (data && Array.isArray(data.items)) {
+      relations = data.items;
+    } else {
+      console.error('Unexpected e-Boekhouden relations format:', JSON.stringify(data).substring(0, 500));
+      return [];
+    }
+
+    // Log first relation to see field names
+    if (relations.length > 0) {
+      console.log('e-Boekhouden relation fields:', Object.keys(relations[0]));
+    }
+
+    return relations;
+  } catch (error) {
+    console.error('e-Boekhouden relations error:', error);
+    return [];
+  }
+}
+
+// Get invoice templates from e-Boekhouden
+async function getEboekhoudenTemplates(sessionToken: string): Promise<any[]> {
+  try {
+    const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/invoicetemplate`, {
+      method: 'GET',
+      headers: {
+        'Authorization': sessionToken,
+      },
+    });
+
+    if (!response.ok) {
+      console.error('e-Boekhouden templates error:', await response.text());
+      return [];
+    }
+
+    const data = await response.json();
+
     if (Array.isArray(data)) {
       return data;
-    }
-    if (data && Array.isArray(data.relations)) {
-      return data.relations;
     }
     if (data && Array.isArray(data.data)) {
       return data.data;
     }
-    if (data && Array.isArray(data.items)) {
-      return data.items;
+    if (data && Array.isArray(data.templates)) {
+      return data.templates;
     }
 
-    console.error('Unexpected e-Boekhouden relations format:', JSON.stringify(data).substring(0, 500));
     return [];
   } catch (error) {
-    console.error('e-Boekhouden relations error:', error);
+    console.error('e-Boekhouden templates error:', error);
     return [];
   }
 }
@@ -255,9 +293,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json(ledgers);
     }
 
+    // GET /eboekhouden/templates - Get invoice templates from e-Boekhouden
+    if (firstParam === 'templates' && req.method === 'GET') {
+      const sessionToken = await createEboekhoudenSession();
+      if (!sessionToken) {
+        return res.status(500).json({ error: 'Could not connect to e-Boekhouden' });
+      }
+
+      const templates = await getEboekhoudenTemplates(sessionToken);
+      return res.json(templates);
+    }
+
     // POST /eboekhouden/send-invoice - Send an invoice to e-Boekhouden
     if (firstParam === 'send-invoice' && req.method === 'POST') {
-      const { invoiceId, relationId, templateId = 1, ledgerId = 8000 } = req.body;
+      let { invoiceId, relationId, templateId, ledgerId = 8000 } = req.body;
 
       if (!invoiceId) {
         return res.status(400).json({ error: 'invoiceId is required' });
@@ -293,18 +342,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invoice has no items to send' });
       }
 
-      console.log('Sending invoice to e-Boekhouden:', {
-        invoiceId,
-        relationId,
-        itemCount: invoice.items.length,
-        taxRate: Number(invoice.taxRate),
-      });
-
       // Create session
       const sessionToken = await createEboekhoudenSession();
       if (!sessionToken) {
         return res.status(500).json({ error: 'Could not connect to e-Boekhouden' });
       }
+
+      // If no templateId provided, fetch available templates and use the first one
+      if (!templateId) {
+        const templates = await getEboekhoudenTemplates(sessionToken);
+        if (templates.length === 0) {
+          return res.status(400).json({ error: 'No invoice templates found in e-Boekhouden. Please create a template first.' });
+        }
+        templateId = templates[0].id;
+        console.log('Using first available template:', templateId, templates[0].name || templates[0].description);
+      }
+
+      console.log('Sending invoice to e-Boekhouden:', {
+        invoiceId,
+        relationId,
+        templateId,
+        itemCount: invoice.items.length,
+        taxRate: Number(invoice.taxRate),
+      });
 
       // Map invoice items to e-Boekhouden format
       const taxRateNum = Number(invoice.taxRate);
