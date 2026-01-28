@@ -40,6 +40,12 @@ import { CSS } from '@dnd-kit/utilities';
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 6); // 6:00 - 20:00
 
+// Read showSunday setting from localStorage
+function getShowSunday(): boolean {
+  const stored = localStorage.getItem('pt-planner-show-sunday');
+  return stored === 'true';
+}
+
 // Get current time in Amsterdam timezone
 function getAmsterdamTime(): { hours: number; minutes: number } {
   const now = new Date();
@@ -351,6 +357,18 @@ export default function CalendarPage() {
   // View mode: default based on screen size, but can be toggled
   const [viewModeOverride, setViewModeOverride] = useState<ViewMode | null>(null);
   const viewMode: ViewMode = viewModeOverride ?? (isMobile ? 'day' : 'week');
+
+  // Show Sunday setting (from localStorage)
+  const [showSunday, setShowSunday] = useState(getShowSunday);
+
+  // Listen for settings changes from SettingsPage
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      setShowSunday(getShowSunday());
+    };
+    window.addEventListener('pt-planner-settings-changed', handleSettingsChange);
+    return () => window.removeEventListener('pt-planner-settings-changed', handleSettingsChange);
+  }, []);
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -440,7 +458,8 @@ export default function CalendarPage() {
   // Days to display based on view mode (not screen size)
   const days = viewMode === 'day'
     ? [currentDate] // Single day view
-    : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Week view
+    : Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+        .filter(day => showSunday || getDay(day) !== 0); // Filter out Sunday if setting is off
 
   // Expand recurring appointments within the visible range
   const expandedAppointments = useMemo(() => {

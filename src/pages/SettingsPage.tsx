@@ -21,11 +21,11 @@ export default function SettingsPage() {
   const [showIcalEvents, setShowIcalEvents] = useState(true);
   const [urlError, setUrlError] = useState('');
 
-  // Display settings (local state for now)
-  const [defaultView, setDefaultView] = useState('week');
-  const [firstDay, setFirstDay] = useState('monday');
-  const [workStart, setWorkStart] = useState('06:00');
-  const [workEnd, setWorkEnd] = useState('21:00');
+  // Display settings (stored in localStorage)
+  const [showSunday, setShowSunday] = useState(() => {
+    const stored = localStorage.getItem('pt-planner-show-sunday');
+    return stored === null ? false : stored === 'true';
+  });
 
   // Fetch iCal settings
   const { data: icalSettings } = useQuery({
@@ -96,15 +96,50 @@ export default function SettingsPage() {
     }
   };
 
+  const handleToggleShowSunday = (checked: boolean) => {
+    setShowSunday(checked);
+    localStorage.setItem('pt-planner-show-sunday', String(checked));
+    // Dispatch event so CalendarPage can react to the change
+    window.dispatchEvent(new CustomEvent('pt-planner-settings-changed'));
+  };
+
   return (
-    <div className="p-6 max-w-4xl">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Instellingen</h1>
+    <div className="p-4 lg:p-6 max-w-4xl">
+      <header className="mb-4 lg:mb-6">
+        <h1 className="text-xl lg:text-2xl font-semibold text-gray-900">Instellingen</h1>
       </header>
 
-      <div className="space-y-6">
+      <div className="space-y-4 lg:space-y-6">
+        {/* Calendar Display Settings */}
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+            <Palette className="w-5 h-5 text-primary-500" />
+            Kalender Weergave
+          </h2>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0 mr-4">
+                <p className="font-medium text-gray-900">Toon zondag</p>
+                <p className="text-sm text-gray-500">
+                  Toon zondag in de weekweergave
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={showSunday}
+                  onChange={(e) => handleToggleShowSunday(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
+              </label>
+            </div>
+          </div>
+        </section>
+
         {/* Calendar Connections */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-primary-500" />
             Externe Kalender
@@ -120,14 +155,14 @@ export default function SettingsPage() {
                   : 'border-gray-200'
               )}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Calendar className="w-6 h-6 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-gray-900">iCal Kalender Feed</h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Koppel een externe kalender via iCal URL (Google Calendar, Outlook, Apple Calendar, etc.)
+                    Koppel een externe kalender via iCal URL
                   </p>
 
                   {isConnected ? (
@@ -149,7 +184,7 @@ export default function SettingsPage() {
                           setIcalUrl(e.target.value);
                           setUrlError('');
                         }}
-                        placeholder="https://calendar.google.com/calendar/ical/..."
+                        placeholder="https://calendar.google.com/..."
                         className={clsx(
                           'w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none',
                           urlError ? 'border-red-300' : 'border-gray-300'
@@ -169,7 +204,7 @@ export default function SettingsPage() {
                     <button
                       onClick={handleDisconnect}
                       disabled={disconnectMutation.isPending}
-                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      className="w-full sm:w-auto px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
                       {disconnectMutation.isPending ? 'Bezig...' : 'Ontkoppelen'}
                     </button>
@@ -177,7 +212,7 @@ export default function SettingsPage() {
                     <button
                       onClick={handleConnect}
                       disabled={saveSettingsMutation.isPending || !icalUrl.trim()}
-                      className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                      className="w-full sm:w-auto px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                     >
                       {saveSettingsMutation.isPending ? 'Bezig...' : 'Verbinden'}
                     </button>
@@ -186,147 +221,84 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Help text */}
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-              <p className="font-medium text-gray-700 mb-2">Hoe vind ik mijn iCal URL?</p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="font-medium text-gray-500">Google:</span>
-                  <span>
-                    Calendar Settings &gt; Agenda &gt; "Secret address in iCal format"
-                    <a
-                      href="https://support.google.com/calendar/answer/37648"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-1 text-primary-500 hover:underline inline-flex items-center gap-0.5"
-                    >
-                      Meer info <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-medium text-gray-500">Outlook:</span>
-                  <span>Calendar Settings &gt; Shared calendars &gt; Publish a calendar</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-medium text-gray-500">Apple:</span>
-                  <span>Calendar app &gt; Deel kalender &gt; Openbare kalender</span>
-                </li>
-              </ul>
-            </div>
+            {/* Help text - collapsible on mobile */}
+            <details className="bg-gray-50 rounded-lg">
+              <summary className="p-4 text-sm font-medium text-gray-700 cursor-pointer">
+                Hoe vind ik mijn iCal URL?
+              </summary>
+              <div className="px-4 pb-4 text-sm text-gray-600">
+                <ul className="space-y-2">
+                  <li className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                    <span className="font-medium text-gray-500">Google:</span>
+                    <span>
+                      Settings &gt; Agenda &gt; "Secret address in iCal format"
+                      <a
+                        href="https://support.google.com/calendar/answer/37648"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-1 text-primary-500 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        Meer info <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </span>
+                  </li>
+                  <li className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                    <span className="font-medium text-gray-500">Outlook:</span>
+                    <span>Settings &gt; Shared calendars &gt; Publish</span>
+                  </li>
+                  <li className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                    <span className="font-medium text-gray-500">Apple:</span>
+                    <span>Calendar app &gt; Deel &gt; Openbare kalender</span>
+                  </li>
+                </ul>
+              </div>
+            </details>
           </div>
 
           {/* Sync Settings */}
           {isConnected && (
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="font-medium text-gray-900 mb-4">
-                Weergave Instellingen
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      Toon externe afspraken
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Toon afspraken uit je externe kalender in de PT Planner agenda
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showIcalEvents}
-                      onChange={(e) => handleToggleShowEvents(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                  </label>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 mr-4">
+                  <p className="font-medium text-gray-900">
+                    Toon externe afspraken
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Toon afspraken uit je externe kalender
+                  </p>
                 </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={showIcalEvents}
+                    onChange={(e) => handleToggleShowEvents(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
+                </label>
               </div>
             </div>
           )}
         </section>
 
         {/* Accounting Connection */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-primary-500" />
             Boekhoudkoppeling
           </h2>
 
-          <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg opacity-60">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-gray-200 rounded-lg opacity-60">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600 flex-shrink-0">
               <LinkIcon className="w-6 h-6" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900">Moneybird</h3>
-              <p className="text-sm text-gray-500">Niet verbonden</p>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-gray-900">e-Boekhouden</h3>
+              <p className="text-sm text-gray-500">Geconfigureerd via omgevingsvariabelen</p>
               <span className="text-xs text-gray-400 flex items-center gap-1 mt-1">
                 <Clock className="w-3 h-3" />
-                Binnenkort beschikbaar
+                Zie Overzicht pagina voor status
               </span>
-            </div>
-            <button
-              disabled
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-400 cursor-not-allowed"
-            >
-              Verbinden
-            </button>
-          </div>
-        </section>
-
-        {/* Display Settings */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-            <Palette className="w-5 h-5 text-primary-500" />
-            Weergave
-          </h2>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-gray-900">
-                Standaard kalenderweergave
-              </p>
-              <select
-                value={defaultView}
-                onChange={(e) => setDefaultView(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-              >
-                <option value="day">Dag</option>
-                <option value="week">Week</option>
-                <option value="month">Maand</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-gray-900">
-                Eerste dag van de week
-              </p>
-              <select
-                value={firstDay}
-                onChange={(e) => setFirstDay(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-              >
-                <option value="monday">Maandag</option>
-                <option value="sunday">Zondag</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-gray-900">Werkuren tonen</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="time"
-                  value={workStart}
-                  onChange={(e) => setWorkStart(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                />
-                <span className="text-gray-500">tot</span>
-                <input
-                  type="time"
-                  value={workEnd}
-                  onChange={(e) => setWorkEnd(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                />
-              </div>
             </div>
           </div>
         </section>
