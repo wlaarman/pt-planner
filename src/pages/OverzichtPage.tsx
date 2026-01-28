@@ -157,7 +157,15 @@ export default function OverzichtPage() {
     enabled: !!sendToEboekhoudenModal,
   });
 
-  const eboekhoudenLedgers = Array.isArray(eboekhoudenLedgersData) ? eboekhoudenLedgersData : [];
+  // Handle ledgers response (may be { ledgers: [], debug: {} } or just [])
+  const eboekhoudenLedgers = Array.isArray(eboekhoudenLedgersData)
+    ? eboekhoudenLedgersData
+    : (eboekhoudenLedgersData?.ledgers || []);
+
+  // Log ledgers debug info
+  if (eboekhoudenLedgersData?.debug) {
+    console.log('e-Boekhouden ledgers debug:', eboekhoudenLedgersData.debug);
+  }
 
   // Ensure relations is always an array (defensive against API response format issues)
   // The API now returns { relations: [], debug: {} }

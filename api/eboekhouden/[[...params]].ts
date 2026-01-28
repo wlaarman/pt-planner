@@ -257,7 +257,9 @@ async function getEboekhoudenTemplates(sessionToken: string): Promise<{ template
 }
 
 // Get ledger accounts from e-Boekhouden
-async function getEboekhoudenLedgers(sessionToken: string): Promise<any[]> {
+async function getEboekhoudenLedgers(sessionToken: string): Promise<{ ledgers: any[], debug: any }> {
+  const debug: any = { endpoint: '/v1/ledger?limit=500' };
+
   try {
     const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/ledger?limit=500`, {
       method: 'GET',
@@ -266,15 +268,37 @@ async function getEboekhoudenLedgers(sessionToken: string): Promise<any[]> {
       },
     });
 
+    const responseText = await response.text();
+    debug.status = response.status;
+    debug.responsePreview = responseText.substring(0, 500);
+
     if (!response.ok) {
-      console.error('e-Boekhouden ledgers error:', await response.text());
-      return [];
+      console.error('e-Boekhouden ledgers error:', responseText);
+      return { ledgers: [], debug };
     }
 
-    return await response.json();
+    const data = JSON.parse(responseText);
+
+    let ledgers: any[] = [];
+    if (Array.isArray(data)) {
+      ledgers = data;
+    } else if (data && Array.isArray(data.data)) {
+      ledgers = data.data;
+    } else if (data && Array.isArray(data.ledgers)) {
+      ledgers = data.ledgers;
+    }
+
+    debug.ledgersFound = ledgers.length;
+    if (ledgers.length > 0) {
+      debug.sampleLedger = ledgers[0];
+      debug.availableFields = Object.keys(ledgers[0]);
+    }
+
+    return { ledgers, debug };
   } catch (error) {
     console.error('e-Boekhouden ledgers error:', error);
-    return [];
+    debug.error = String(error);
+    return { ledgers: [], debug };
   }
 }
 
@@ -347,8 +371,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: 'Could not connect to e-Boekhouden' });
       }
 
-      const ledgers = await getEboekhoudenLedgers(sessionToken);
-      return res.json(ledgers);
+      const { ledgers, debug } = await getEboekhoudenLedgers(sessionToken);
+      return res.json({ ledgers, debug });
     }
 
     // GET /eboekhouden/templates - Get invoice templates from e-Boekhouden
