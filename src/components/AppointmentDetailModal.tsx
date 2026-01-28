@@ -214,17 +214,17 @@ export default function AppointmentDetailModal({
             Verwijderen
           </button>
           <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors font-medium"
-          >
-            Sluiten
-          </button>
-          <button
             onClick={onEdit}
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 active:bg-primary-700 transition-colors font-medium"
           >
             <Pencil className="w-4 h-4" />
             Bewerken
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors font-medium"
+          >
+            Sluiten
           </button>
         </div>
       </div>
