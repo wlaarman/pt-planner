@@ -127,10 +127,30 @@ async function sendInvoiceToEboekhouden(
   }
 }
 
-// Get relations from e-Boekhouden
+// Get single relation details from e-Boekhouden
+async function getEboekhoudenRelationDetails(sessionToken: string, relationId: number): Promise<any | null> {
+  try {
+    const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/relation/${relationId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': sessionToken,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+// Get relations from e-Boekhouden (with full details)
 async function getEboekhoudenRelations(sessionToken: string): Promise<any[]> {
   try {
-    const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/relation?limit=500`, {
+    const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/relation?limit=100`, {
       method: 'GET',
       headers: {
         'Authorization': sessionToken,
@@ -159,12 +179,23 @@ async function getEboekhoudenRelations(sessionToken: string): Promise<any[]> {
       return [];
     }
 
-    // Log first relation to see field names
-    if (relations.length > 0) {
-      console.log('e-Boekhouden relation fields:', Object.keys(relations[0]));
+    // Fetch full details for each relation (parallel, max 20 at a time)
+    const relationsWithDetails = await Promise.all(
+      relations.slice(0, 50).map(async (rel) => {
+        const details = await getEboekhoudenRelationDetails(sessionToken, rel.id);
+        if (details) {
+          return { ...rel, ...details };
+        }
+        return rel;
+      })
+    );
+
+    // Log first relation to see all available field names
+    if (relationsWithDetails.length > 0) {
+      console.log('e-Boekhouden relation full fields:', Object.keys(relationsWithDetails[0]));
     }
 
-    return relations;
+    return relationsWithDetails;
   } catch (error) {
     console.error('e-Boekhouden relations error:', error);
     return [];
