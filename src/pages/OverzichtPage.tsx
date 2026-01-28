@@ -331,50 +331,49 @@ export default function OverzichtPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-5 mb-4 lg:mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 lg:gap-4">
           {/* Period Selection */}
-          <div className="flex-1">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Periode
             </label>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center flex-1">
-                <button
-                  onClick={() => handleMonthChange('prev')}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-l-lg border border-r-0 border-gray-300 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <div className="flex-1 px-3 py-2 bg-white border-y border-gray-300 text-center">
-                  <span className="text-sm font-medium text-gray-900 capitalize">{periodLabel}</span>
-                </div>
-                <button
-                  onClick={() => handleMonthChange('next')}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-r-lg border border-l-0 border-gray-300 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            {/* Quick period buttons */}
-            <div className="flex gap-1 mt-2">
+            <div className="flex items-center">
               <button
-                onClick={() => setSelectedMonth(subMonths(new Date(), 1))}
-                className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                onClick={() => handleMonthChange('prev')}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-l-lg border border-r-0 border-gray-300 transition-colors"
               >
-                Vorige maand
+                <ChevronLeft className="w-4 h-4" />
               </button>
+              <div className="w-32 px-3 py-2 bg-white border-y border-gray-300 text-center">
+                <span className="text-sm font-medium text-gray-900 capitalize">{periodLabel}</span>
+              </div>
               <button
-                onClick={() => setSelectedMonth(new Date())}
-                className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                onClick={() => handleMonthChange('next')}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-r-lg border border-l-0 border-gray-300 transition-colors"
               >
-                Deze maand
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
+          {/* Quick period buttons */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => setSelectedMonth(subMonths(new Date(), 1))}
+              className="px-3 py-2 text-sm text-gray-600 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              Vorige maand
+            </button>
+            <button
+              onClick={() => setSelectedMonth(new Date())}
+              className="px-3 py-2 text-sm text-gray-600 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              Deze maand
+            </button>
+          </div>
+
           {/* Search Button */}
-          <div className="flex items-end">
+          <div className="sm:ml-auto">
             <button
               onClick={handleShowResults}
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
@@ -590,7 +589,7 @@ export default function OverzichtPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={toggleAllInvoices}
-                  className="text-sm text-gray-600 hover:text-gray-900"
+                  className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {selectedInvoices.size === sendableInvoices.length ? 'Deselecteer alle' : 'Selecteer alle'}
                 </button>
