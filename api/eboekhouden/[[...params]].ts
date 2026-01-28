@@ -282,6 +282,8 @@ async function getEboekhoudenLedgers(sessionToken: string): Promise<{ ledgers: a
     let ledgers: any[] = [];
     if (Array.isArray(data)) {
       ledgers = data;
+    } else if (data && Array.isArray(data.items)) {
+      ledgers = data.items;
     } else if (data && Array.isArray(data.data)) {
       ledgers = data.data;
     } else if (data && Array.isArray(data.ledgers)) {
