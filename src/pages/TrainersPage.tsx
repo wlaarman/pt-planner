@@ -31,9 +31,16 @@ export default function TrainersPage() {
     },
   });
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Weet je zeker dat je ${name} wilt verwijderen?`)) {
-      deleteMutation.mutate(id);
+  const handleDelete = (trainer: Trainer) => {
+    const appointmentCount = trainer._count.appointments;
+    let message = `Weet je zeker dat je ${trainer.name} wilt verwijderen?`;
+
+    if (appointmentCount > 0) {
+      message = `${trainer.name} heeft ${appointmentCount} afspra${appointmentCount === 1 ? 'ak' : 'ken'}.\n\nAls je doorgaat worden deze afspraken ook verwijderd.\n\nWeet je zeker dat je wilt doorgaan?`;
+    }
+
+    if (confirm(message)) {
+      deleteMutation.mutate(trainer.id);
     }
   };
 
@@ -141,7 +148,7 @@ export default function TrainersPage() {
                     Bewerken
                   </button>
                   <button
-                    onClick={() => handleDelete(trainer.id, trainer.name)}
+                    onClick={() => handleDelete(trainer)}
                     disabled={deleteMutation.isPending}
                     className="px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 active:bg-red-200 rounded-lg transition-colors"
                   >

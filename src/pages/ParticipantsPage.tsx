@@ -33,9 +33,16 @@ export default function ParticipantsPage() {
     },
   });
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Weet je zeker dat je ${name} wilt verwijderen?`)) {
-      deleteMutation.mutate(id);
+  const handleDelete = (participant: Participant) => {
+    const appointmentCount = participant._count.appointments;
+    let message = `Weet je zeker dat je ${participant.name} wilt verwijderen?`;
+
+    if (appointmentCount > 0) {
+      message = `${participant.name} heeft ${appointmentCount} afspra${appointmentCount === 1 ? 'ak' : 'ken'}.\n\nAls je doorgaat worden deze afspraken ook verwijderd.\n\nWeet je zeker dat je wilt doorgaan?`;
+    }
+
+    if (confirm(message)) {
+      deleteMutation.mutate(participant.id);
     }
   };
 
@@ -165,7 +172,7 @@ export default function ParticipantsPage() {
                     Bewerken
                   </button>
                   <button
-                    onClick={() => handleDelete(participant.id, participant.name)}
+                    onClick={() => handleDelete(participant)}
                     className="px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 active:bg-red-200 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -250,7 +257,7 @@ export default function ParticipantsPage() {
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(participant.id, participant.name)}
+                          onClick={() => handleDelete(participant)}
                           className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Verwijderen"
                         >

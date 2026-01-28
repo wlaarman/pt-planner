@@ -294,7 +294,7 @@ export default function AppointmentModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-lg font-semibold">
-            {editingAppointment ? 'Afspraak Bewerken' : 'Nieuwe Afspraak'}
+            {editingAppointment ? 'Bewerken' : 'Nieuwe afspraak'}
           </h2>
           <button
             onClick={onClose}
@@ -450,7 +450,7 @@ export default function AppointmentModal({
                   Deelnemer{maxParticipants > 1 ? 's' : ''} * ({selectedParticipants.length}/{maxParticipants})
                 </label>
 
-                {/* Search input */}
+                {/* Search input - text-base (16px) prevents iOS zoom on focus */}
                 {participants.length > 5 && (
                   <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -459,7 +459,7 @@ export default function AppointmentModal({
                       value={participantSearch}
                       onChange={(e) => setParticipantSearch(e.target.value)}
                       placeholder="Zoek deelnemer..."
-                      className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     />
                   </div>
                 )}
@@ -530,7 +530,7 @@ export default function AppointmentModal({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="flex-[2] min-w-0 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+                    className="flex-[2] min-w-0 px-2 h-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
                   />
                   <select
                     value={startTime}
@@ -544,7 +544,7 @@ export default function AppointmentModal({
                       }
                     }}
                     className={clsx(
-                      "flex-1 min-w-0 px-1.5 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
+                      "flex-1 min-w-0 px-1.5 h-10 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
                       touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
                     )}
                   >
@@ -560,7 +560,7 @@ export default function AppointmentModal({
                       setTouched(t => ({ ...t, time: true }));
                     }}
                     className={clsx(
-                      "flex-1 min-w-0 px-1.5 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
+                      "flex-1 min-w-0 px-1.5 h-10 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm",
                       touched.time && validationErrors.time ? "border-red-300" : "border-gray-300"
                     )}
                   >

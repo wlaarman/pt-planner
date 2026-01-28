@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   format,
@@ -32,7 +32,6 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
-  TouchSensor,
   closestCenter,
   DragEndEvent,
   DragStartEvent,
@@ -143,13 +142,14 @@ function expandRecurringAppointments(
         });
       }
 
-      // Move to next occurrence
+      // Move to next occurrence - use addDays to handle DST correctly
       if (apt.recurrenceRule === 'monthly') {
         // For monthly, add actual month
         currentStart = new Date(currentStart);
         currentStart.setMonth(currentStart.getMonth() + 1);
       } else {
-        currentStart = new Date(currentStart.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+        // Use addDays instead of milliseconds to preserve time across DST changes
+        currentStart = addDays(currentStart, intervalDays);
       }
       instanceCount++;
     }
@@ -329,9 +329,27 @@ function AppointmentDragPreview({ apt }: { apt: Appointment }) {
 
 type ViewMode = 'day' | 'week';
 
+// Hook to detect mobile screen
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isMobile;
+}
+
 export default function CalendarPage() {
+  const isMobile = useIsMobile();
+
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  // View mode based on screen size: day for mobile, week for desktop
+  const viewMode: ViewMode = isMobile ? 'day' : 'week';
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -346,17 +364,12 @@ export default function CalendarPage() {
 
   const queryClient = useQueryClient();
 
-  // Setup drag sensors with proper activation constraints
+  // Setup drag sensors - only on desktop (no touch drag on mobile)
   const pointerSensor = useSensor(PointerSensor, {
     activationConstraint: { distance: 8 }, // 8px before drag starts
   });
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 200, // 200ms delay before drag on touch
-      tolerance: 5, // Can move 5px during delay
-    },
-  });
-  const sensors = useSensors(pointerSensor, touchSensor);
+  // Only use pointer sensor on desktop, disable drag & drop on mobile
+  const sensors = useSensors(isMobile ? undefined : pointerSensor);
 
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -618,7 +631,7 @@ export default function CalendarPage() {
     return { top: `${top}px`, height: `${height}px` };
   };
 
-  // Touch handlers for swipe navigation (mobile)
+  // Touch handlers for swipe navigation (mobile - always day by day)
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
@@ -631,13 +644,14 @@ export default function CalendarPage() {
     const diffY = touchStartY.current - touchEndY;
 
     // Only handle horizontal swipes (ignore vertical scrolling)
+    // On mobile: always navigate day by day
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
       if (diffX > 0) {
-        // Swipe left - next day/week
-        setCurrentDate(viewMode === 'day' ? addDays(currentDate, 1) : addWeeks(currentDate, 1));
+        // Swipe left - next day
+        setCurrentDate(addDays(currentDate, 1));
       } else {
-        // Swipe right - previous day/week
-        setCurrentDate(viewMode === 'day' ? subDays(currentDate, 1) : subWeeks(currentDate, 1));
+        // Swipe right - previous day
+        setCurrentDate(subDays(currentDate, 1));
       }
     }
   };
@@ -686,7 +700,7 @@ export default function CalendarPage() {
             {/* Navigation */}
             <div className="flex items-center gap-1 lg:gap-2">
               <button
-                onClick={() => setCurrentDate(viewMode === 'day' ? subDays(currentDate, 1) : subWeeks(currentDate, 1))}
+                onClick={() => setCurrentDate(isMobile ? subDays(currentDate, 1) : subWeeks(currentDate, 1))}
                 className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -698,7 +712,7 @@ export default function CalendarPage() {
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[140px] justify-center"
               >
                 <span className="font-semibold text-gray-900">
-                  {viewMode === 'day'
+                  {isMobile
                     ? format(currentDate, 'd MMMM', { locale: nl })
                     : format(currentDate, 'MMMM yyyy', { locale: nl })}
                 </span>
@@ -706,7 +720,7 @@ export default function CalendarPage() {
               </button>
 
               <button
-                onClick={() => setCurrentDate(viewMode === 'day' ? addDays(currentDate, 1) : addWeeks(currentDate, 1))}
+                onClick={() => setCurrentDate(isMobile ? addDays(currentDate, 1) : addWeeks(currentDate, 1))}
                 className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -718,32 +732,6 @@ export default function CalendarPage() {
               >
                 Vandaag
               </button>
-
-              {/* View mode toggle */}
-              <div className="ml-2 flex rounded-lg border border-gray-300 overflow-hidden">
-                <button
-                  onClick={() => setViewMode('day')}
-                  className={clsx(
-                    'px-3 py-1.5 text-sm transition-colors',
-                    viewMode === 'day'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  )}
-                >
-                  Dag
-                </button>
-                <button
-                  onClick={() => setViewMode('week')}
-                  className={clsx(
-                    'px-3 py-1.5 text-sm transition-colors border-l border-gray-300',
-                    viewMode === 'week'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  )}
-                >
-                  Week
-                </button>
-              </div>
             </div>
           </div>
 
