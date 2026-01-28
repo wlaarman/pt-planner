@@ -107,16 +107,9 @@ async function sendInvoiceToEboekhouden(
     console.log('e-Boekhouden invoice response:', response.status, responseText);
 
     if (!response.ok) {
-      // Try to parse error message from response
-      let errorMessage = responseText;
-      try {
-        const errorJson = JSON.parse(responseText);
-        errorMessage = errorJson.message || errorJson.error || responseText;
-      } catch {
-        // Keep raw text if not JSON
-      }
-      console.error('e-Boekhouden invoice error:', errorMessage);
-      return { success: false, error: errorMessage };
+      // Return full error details from e-Boekhouden
+      console.error('e-Boekhouden invoice error:', responseText);
+      return { success: false, error: responseText };
     }
 
     const data = JSON.parse(responseText);

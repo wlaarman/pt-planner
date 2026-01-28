@@ -171,7 +171,12 @@ export default function OverzichtPage() {
     },
     onError: (error: any) => {
       console.error('e-Boekhouden send error:', error);
-      setSendError(error?.response?.data?.error || error?.message || 'Onbekende fout');
+      console.error('e-Boekhouden error response:', error?.response?.data);
+      const errorData = error?.response?.data;
+      const errorMsg = typeof errorData === 'string'
+        ? errorData
+        : errorData?.error || errorData?.message || JSON.stringify(errorData) || error?.message || 'Onbekende fout';
+      setSendError(errorMsg);
     },
   });
 
