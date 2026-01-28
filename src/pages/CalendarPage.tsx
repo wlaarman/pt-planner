@@ -348,8 +348,9 @@ export default function CalendarPage() {
   const isMobile = useIsMobile();
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  // View mode based on screen size: day for mobile, week for desktop
-  const viewMode: ViewMode = isMobile ? 'day' : 'week';
+  // View mode: default based on screen size, but can be toggled
+  const [viewModeOverride, setViewModeOverride] = useState<ViewMode | null>(null);
+  const viewMode: ViewMode = viewModeOverride ?? (isMobile ? 'day' : 'week');
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -631,7 +632,7 @@ export default function CalendarPage() {
     return { top: `${top}px`, height: `${height}px` };
   };
 
-  // Touch handlers for swipe navigation (mobile - always day by day)
+  // Touch handlers for swipe navigation
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
@@ -644,14 +645,13 @@ export default function CalendarPage() {
     const diffY = touchStartY.current - touchEndY;
 
     // Only handle horizontal swipes (ignore vertical scrolling)
-    // On mobile: always navigate day by day
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
       if (diffX > 0) {
-        // Swipe left - next day
-        setCurrentDate(addDays(currentDate, 1));
+        // Swipe left - next day/week based on view mode
+        setCurrentDate(viewMode === 'day' ? addDays(currentDate, 1) : addWeeks(currentDate, 1));
       } else {
-        // Swipe right - previous day
-        setCurrentDate(subDays(currentDate, 1));
+        // Swipe right - previous day/week based on view mode
+        setCurrentDate(viewMode === 'day' ? subDays(currentDate, 1) : subWeeks(currentDate, 1));
       }
     }
   };
@@ -700,7 +700,7 @@ export default function CalendarPage() {
             {/* Navigation */}
             <div className="flex items-center gap-1 lg:gap-2">
               <button
-                onClick={() => setCurrentDate(isMobile ? subDays(currentDate, 1) : subWeeks(currentDate, 1))}
+                onClick={() => setCurrentDate(viewMode === 'day' ? subDays(currentDate, 1) : subWeeks(currentDate, 1))}
                 className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -712,7 +712,7 @@ export default function CalendarPage() {
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[140px] justify-center"
               >
                 <span className="font-semibold text-gray-900">
-                  {isMobile
+                  {viewMode === 'day'
                     ? format(currentDate, 'd MMMM', { locale: nl })
                     : format(currentDate, 'MMMM yyyy', { locale: nl })}
                 </span>
@@ -720,7 +720,7 @@ export default function CalendarPage() {
               </button>
 
               <button
-                onClick={() => setCurrentDate(isMobile ? addDays(currentDate, 1) : addWeeks(currentDate, 1))}
+                onClick={() => setCurrentDate(viewMode === 'day' ? addDays(currentDate, 1) : addWeeks(currentDate, 1))}
                 className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -728,9 +728,18 @@ export default function CalendarPage() {
 
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="ml-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
               >
                 Vandaag
+              </button>
+
+              {/* Subtle view toggle */}
+              <button
+                onClick={() => setViewModeOverride(viewMode === 'day' ? 'week' : 'day')}
+                className="w-7 h-7 text-xs font-medium text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center"
+                title={viewMode === 'day' ? 'Weekweergave' : 'Dagweergave'}
+              >
+                {viewMode === 'day' ? 'W' : 'D'}
               </button>
             </div>
           </div>

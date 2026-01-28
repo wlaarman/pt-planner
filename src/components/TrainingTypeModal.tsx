@@ -129,11 +129,11 @@ export default function TrainingTypeModal({ isOpen, onClose, editType }: Trainin
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-white w-full lg:max-w-md lg:rounded-xl rounded-t-xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="relative bg-white w-full lg:max-w-md lg:rounded-xl rounded-t-xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-lg font-semibold">
-            {editType ? 'Trainingstype Bewerken' : 'Nieuw Trainingstype'}
+            {editType ? 'Bewerken' : 'Nieuw type'}
           </h2>
           <button
             onClick={onClose}
