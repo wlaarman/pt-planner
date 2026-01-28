@@ -243,6 +243,10 @@ export const eboekhoudenApi = {
     const { data } = await api.get('/eboekhouden/relations');
     return data;
   },
+  getTemplates: async () => {
+    const { data } = await api.get('/eboekhouden/templates');
+    return data;
+  },
   getLedgers: async () => {
     const { data } = await api.get('/eboekhouden/ledgers');
     return data;

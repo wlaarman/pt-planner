@@ -141,6 +141,13 @@ export default function OverzichtPage() {
     enabled: !!sendToEboekhoudenModal,
   });
 
+  // Fetch e-Boekhouden templates when modal is open
+  const { data: eboekhoudenTemplatesData } = useQuery({
+    queryKey: ['eboekhouden-templates'],
+    queryFn: () => eboekhoudenApi.getTemplates(),
+    enabled: !!sendToEboekhoudenModal,
+  });
+
   // Ensure relations is always an array (defensive against API response format issues)
   // The API now returns { relations: [], debug: {} }
   const eboekhoudenRelations = Array.isArray(eboekhoudenRelationsData)
@@ -150,6 +157,11 @@ export default function OverzichtPage() {
   // Log debug info if available
   if (eboekhoudenRelationsData?.debug) {
     console.log('e-Boekhouden relations debug:', eboekhoudenRelationsData.debug);
+  }
+
+  // Log templates info
+  if (eboekhoudenTemplatesData !== undefined) {
+    console.log('e-Boekhouden templates:', eboekhoudenTemplatesData);
   }
 
   // e-Boekhouden connection status
