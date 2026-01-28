@@ -279,7 +279,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const relations = await getEboekhoudenRelations(sessionToken);
-      return res.json(relations);
+
+      // Debug: include field names in response
+      const debug = relations.length > 0 ? {
+        availableFields: Object.keys(relations[0]),
+        sampleRelation: relations[0]
+      } : null;
+
+      return res.json({ relations, debug });
     }
 
     // GET /eboekhouden/ledgers - Get ledger accounts from e-Boekhouden

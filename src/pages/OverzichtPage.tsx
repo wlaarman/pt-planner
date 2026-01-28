@@ -142,7 +142,15 @@ export default function OverzichtPage() {
   });
 
   // Ensure relations is always an array (defensive against API response format issues)
-  const eboekhoudenRelations = Array.isArray(eboekhoudenRelationsData) ? eboekhoudenRelationsData : [];
+  // The API now returns { relations: [], debug: {} }
+  const eboekhoudenRelations = Array.isArray(eboekhoudenRelationsData)
+    ? eboekhoudenRelationsData
+    : (eboekhoudenRelationsData?.relations || []);
+
+  // Log debug info if available
+  if (eboekhoudenRelationsData?.debug) {
+    console.log('e-Boekhouden relations debug:', eboekhoudenRelationsData.debug);
+  }
 
   // e-Boekhouden connection status
   const { data: eboekhoudenStatus } = useQuery({
