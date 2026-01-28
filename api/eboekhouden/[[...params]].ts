@@ -78,19 +78,23 @@ async function sendInvoiceToEboekhouden(
       ledgerId: number;
     }>;
     termOfPayment: number;
-    templateId: number;
+    templateId?: number;
     reference?: string;
   }
 ): Promise<{ success: boolean; invoiceNumber?: string; error?: string }> {
   try {
-    const requestBody = {
+    const requestBody: any = {
       relationId: invoice.relationId,
       termOfPayment: invoice.termOfPayment,
-      templateId: invoice.templateId,
       inExVat: 'EX', // Prices excluding VAT
       reference: invoice.reference,
       items: invoice.items,
     };
+
+    // Only include templateId if provided
+    if (invoice.templateId) {
+      requestBody.templateId = invoice.templateId;
+    }
 
     console.log('e-Boekhouden invoice request:', JSON.stringify(requestBody, null, 2));
 
@@ -205,23 +209,30 @@ async function getEboekhoudenTemplates(sessionToken: string): Promise<any[]> {
       },
     });
 
+    const responseText = await response.text();
+    console.log('e-Boekhouden templates response:', response.status, responseText);
+
     if (!response.ok) {
-      console.error('e-Boekhouden templates error:', await response.text());
+      console.error('e-Boekhouden templates error:', responseText);
       return [];
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
 
     if (Array.isArray(data)) {
+      console.log('Templates found:', data.length);
       return data;
     }
     if (data && Array.isArray(data.data)) {
+      console.log('Templates found (data):', data.data.length);
       return data.data;
     }
     if (data && Array.isArray(data.templates)) {
+      console.log('Templates found (templates):', data.templates.length);
       return data.templates;
     }
 
+    console.log('Unexpected templates format:', typeof data, JSON.stringify(data).substring(0, 200));
     return [];
   } catch (error) {
     console.error('e-Boekhouden templates error:', error);
@@ -379,14 +390,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: 'Could not connect to e-Boekhouden' });
       }
 
-      // If no templateId provided, fetch available templates and use the first one
+      // If no templateId provided, try to fetch available templates
       if (!templateId) {
         const templates = await getEboekhoudenTemplates(sessionToken);
-        if (templates.length === 0) {
-          return res.status(400).json({ error: 'No invoice templates found in e-Boekhouden. Please create a template first.' });
+        if (templates.length > 0) {
+          templateId = templates[0].id;
+          console.log('Using first available template:', templateId, templates[0].name || templates[0].description);
+        } else {
+          console.log('No templates found, will try sending without templateId');
         }
-        templateId = templates[0].id;
-        console.log('Using first available template:', templateId, templates[0].name || templates[0].description);
       }
 
       console.log('Sending invoice to e-Boekhouden:', {
