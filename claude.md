@@ -1,9 +1,13 @@
-# PT Planner - Project Knowledge
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-PT Planner is een agenda-applicatie voor personal trainers om afspraken te beheren, deelnemers te tracken en facturen te genereren.
+
+PT Planner is een agenda-applicatie voor personal trainers om afspraken te beheren, deelnemers te tracken en facturen te genereren. De applicatie is in het **Nederlands**.
 
 ## Tech Stack
+
 - **Frontend:** React + TypeScript + Vite
 - **Styling:** Tailwind CSS
 - **State Management:** Zustand (authStore)
@@ -13,214 +17,146 @@ PT Planner is een agenda-applicatie voor personal trainers om afspraken te beher
 - **ORM:** Prisma
 - **Authentication:** JWT tokens
 
+## Development Commands
+
+```bash
+# Start local dev server (frontend only, talks to production API)
+npm run dev
+
+# Build for production
+npm run build
+
+# Lint
+npm run lint
+
+# Database operations
+npm run db:migrate    # Run migrations
+npm run db:push       # Push schema changes
+npm run db:studio     # Open Prisma Studio
+npm run db:seed       # Seed demo data
+```
+
 ## Deployment
-- **Hosting:** Vercel
+
+- **Hosting:** Vercel (auto-deploys from GitHub on push)
 - **URL:** https://pt-planner.vercel.app
-- **BELANGRIJK:** Vercel is gekoppeld aan de GitHub repo. Deployments gebeuren automatisch via git push, NIET via `npx vercel --prod`. Commit en push wijzigingen om te deployen.
+- **BELANGRIJK:** Deploy via `git push`, NIET via `npx vercel --prod`
 - **GitHub repo:** https://github.com/wlaarman/pt-planner
 
 ## Demo Login
+
 - **Email:** jan@ptplanner.nl
 - **Wachtwoord:** trainer123
 
-## Project Structure
+## Architecture
+
+### Project Structure
+
 ```
 /api                    # Vercel serverless functions
-  /appointments         # CRUD voor afspraken
-  /auth                 # Login/register
-  /calendar             # iCal integratie
-  /invoices             # Facturen
-  /participants         # Deelnemers
-  /reports              # Rapportages
-  /trainers             # Trainers
-  /training-types       # Training types
-/lib                    # Shared utilities (NOT in /api to avoid being deployed as functions)
-  auth.ts               # Auth helpers
+/lib                    # Shared utilities (NOT in /api - avoids deployment as functions)
+  auth.ts               # JWT auth helpers
   prisma.ts             # Prisma client singleton
 /prisma
   schema.prisma         # Database schema
   seed.ts               # Demo data
 /src
   /components           # React components
-  /lib
-    api.ts              # API client (axios)
+  /lib/api.ts           # API client (axios)
   /pages                # Page components
   /stores               # Zustand stores
 ```
 
-## API Routes (Vercel)
-Routes gebruiken catch-all files zoals `[[...params]].ts`. De vercel.json bevat rewrites voor base routes:
-- `/api/appointments` → `/api/appointments/_`
-- etc.
+### API Routes Pattern
 
-## Key Features
-1. **Kalender** - Week/dag weergave met drag & drop
-2. **iCal integratie** - Externe kalenders koppelen via iCal URL
-3. **Deelnemers** - Klanten beheren
-4. **Trainers** - Meerdere trainers ondersteunen
-5. **Training types** - 1-op-1, 1-op-2, groepstraining
-6. **Facturen** - Facturen aanmaken en tracken
+Routes use catch-all files like `[[...params]].ts`. The `vercel.json` contains rewrites for base routes.
 
-## Development
-```bash
-# Lokaal draaien (frontend only, praat met productie API)
-npm run dev
-
-# Als je lokaal wilt testen met productie API:
-# Maak .env.local met: VITE_API_URL=https://personaltrainer-psi.vercel.app/api
-
-# Build
-npm run build
-
-# Database migrations
-npx prisma migrate dev
-npx prisma db push
-
-# Seed database
-npx prisma db seed
-```
-
-## Important Libraries
-- `@dnd-kit/core` - Drag & drop voor kalender
-- `ical.js` - iCal parsing voor externe kalenders
-- `date-fns` - Date utilities
-- `clsx` - Conditional classnames
-- `zod` - Schema validation (API)
-- `bcryptjs` - Password hashing
-- `jsonwebtoken` - JWT tokens
-
-## Database (Prisma Schema)
-Belangrijke modellen:
-- `User` - Trainers/admins (heeft icalUrl voor externe kalender)
-- `Participant` - Klanten
-- `Appointment` - Afspraken
-- `TrainingType` - Soorten trainingen
-- `Invoice` - Facturen
-- `CalendarConnection` - OAuth calendar connections (nog niet geïmplementeerd)
-
-## Vercel Beperkingen
-- **Hobby plan limiet:** Max 12 serverless functions per deployment
-- Huidige functions: 12 (op de limiet!)
-- **Oplossing:** Combineer routes in één file waar mogelijk (bijv. `[id].ts` handelt GET/PUT/PATCH/DELETE af)
-- Vermijd aparte files voor sub-routes zoals `/api/xxx/[id]/action` - combineer in `[id].ts`
-
-## Known Issues / TODOs
-- Google Calendar OAuth is nog niet geïmplementeerd (iCal werkt wel)
-- **InvoicesPage blank scherm bug** - Na laden wordt pagina blank door error `Cannot read properties of undefined (reading 'totalParticipants')`. Fix is gepusht maar user moet hard refresh doen (Ctrl+Shift+R) of wachten tot Vercel deployment klaar is. Null checks toegevoegd in `src/pages/InvoicesPage.tsx`.
-
-### OPGELOST: Invoices Billable Endpoint (27 jan 2026)
-
-**Probleem:** Catch-all routes (`[[...params]].ts`) werkten niet - sub-routes retourneerden altijd de base route response.
-
-**Oorzaak:** De code gebruikte `req.query['...params']` maar Vercel geeft de params door met brackets in de key: `req.query['[...params]']`.
-
-**Fix:** Alle catch-all handlers aangepast naar:
+**CRITICAL - Catch-all param extraction:**
 ```typescript
+// Vercel passes params with brackets in the key
 const params = req.query['[...params]'] || req.query['[[...params]]'] || req.query['...params'];
 ```
 
-**Bestanden gefixed:**
-- `api/invoices/[[...params]].ts`
-- `api/participants/[[...params]].ts`
-- `api/trainers/[[...params]].ts`
-- `api/training-types/[[...params]].ts`
-- `api/reports/[[...params]].ts`
+### Vercel Function Limit
 
-## Recent Toegevoegd (januari 2026)
+- **Hobby plan limiet:** Max 12 serverless functions
+- **Currently at the limit (12 functions)**
+- Combine routes in one file (e.g., `[id].ts` handles GET/PUT/PATCH/DELETE)
+- Avoid separate files for sub-routes - combine in the parent handler
 
-### Overzicht Pagina (merged Rapportage + Facturatie)
-Samenvoeging van Rapportage en Facturatie in één mobiel-vriendelijke "Overzicht" pagina:
+### Database Models (Prisma)
 
-**Route:** `/overzicht`
+Key models:
+- `User` - Trainers/admins (has icalUrl for external calendar)
+- `Participant` - Klanten
+- `Appointment` - Afspraken (status: SCHEDULED, COMPLETED, CANCELLED, NO_SHOW)
+- `TrainingType` - Soorten trainingen (1-op-1, 1-op-2, groepstraining)
+- `Invoice` - Facturen met InvoiceItems
+- `AppointmentParticipant` - Many-to-many relatie
 
-**Features:**
-- Tabs: "Te factureren" en "Facturen"
-- Filters: maand-picker, trainer dropdown, deelnemer dropdown
-- "Toon Resultaten" knop om data op te halen (voorkomt onnodige API calls)
-- Summary cards: sessies, uren, totaalbedrag
-- Uitklapbare deelnemerskaarten met details per trainingstype
-- e-Boekhouden verbindingsstatus indicator
-
-**Bestanden:**
-- `src/pages/OverzichtPage.tsx` - Nieuwe gecombineerde pagina
-- `src/pages/ReportsPage.tsx` - Verwijderd
-- `src/pages/InvoicesPage.tsx` - Verwijderd (vervangen door OverzichtPage)
-- `src/App.tsx` - Routes aangepast naar `/overzicht`
-- `src/components/Layout.tsx` - Navigatie aangepast
-
-### e-Boekhouden Integratie
-Koppeling met e-Boekhouden boekhoudpakket:
-
-**Environment variable (Vercel):**
+**Note:** Prisma Decimal values need explicit conversion for comparisons:
+```typescript
+// Wrong: invoice.taxRate === 0
+// Correct: Number(invoice.taxRate) === 0
 ```
-EBOEKHOUDEN_ACCESS_TOKEN=<token>
-```
+
+## Key Features
+
+1. **Kalender** - Week/dag weergave met drag & drop (@dnd-kit/core)
+2. **iCal integratie** - Externe kalenders via iCal URL (ical.js)
+3. **Recurring appointments** - Met recurrenceEndDate en "Alleen deze" / "Hele reeks" edit opties
+4. **Facturatie** - Genereer facturen per periode (alleen COMPLETED afspraken)
+5. **e-Boekhouden integratie** - Facturen versturen naar boekhoudpakket
+
+## e-Boekhouden Integratie
+
+**Environment variable (Vercel):** `EBOEKHOUDEN_ACCESS_TOKEN`
 
 **API endpoints:**
-- `GET /api/eboekhouden/status` - Connectie status checken
+- `GET /api/eboekhouden/status` - Connectie status
 - `GET /api/eboekhouden/relations` - Relaties ophalen
-- `GET /api/eboekhouden/ledgers` - Grootboekrekeningen ophalen
-- `POST /api/eboekhouden/send-invoice` - Factuur versturen naar e-Boekhouden
+- `GET /api/eboekhouden/ledgers` - Grootboekrekeningen
+- `POST /api/eboekhouden/send-invoice` - Factuur versturen
 
-**Frontend:**
-- Connectie status in header (groen = verbonden, oranje = niet verbonden)
-- "Versturen" knop bij facturen in Facturen tab
-- Modal voor relatie selectie bij versturen
+## PWA Support
 
-**Bestanden:**
-- `api/eboekhouden/[[...params]].ts` - API endpoint
-- `src/lib/api.ts` - Frontend API client (eboekhoudenApi)
+De app is installeerbaar als Progressive Web App:
+- `public/manifest.json` - App metadata
+- `public/sw.js` - Service worker (network-first caching)
+- `public/icons/` - App icons (72px - 512px)
+- `scripts/generate-icons.cjs` - Genereer icons uit SVG
 
-### ACTIEF PROBLEEM: e-Boekhouden Invoice Versturen (27 jan 2026)
+Service worker registratie in `src/main.tsx`.
 
-**Symptoom:** Blank scherm na klikken op "Verstuur naar e-Boekhouden"
+## User Settings (localStorage)
 
-**Wat is opgelost:**
-1. Prisma Decimal vergelijking bug - `invoice.taxRate === 0` werkte niet, nu `Number(invoice.taxRate) === 0`
-2. Validatie toegevoegd: check of factuur items heeft
-3. Betere error logging toegevoegd in backend
+Sommige instellingen worden lokaal opgeslagen:
+- `pt-planner-show-sunday` - Toon zondag in weekweergave (default: false)
+- `eboekhouden-template-id` - Laatst gebruikte factuursjabloon ID
+- `eboekhouden-ledger-id` - Laatst gebruikte grootboekrekening ID
 
-**Nog te testen:**
-- Fix is gepusht (commit 44795e5), wachten op Vercel deployment
-- Check browser console (F12) voor foutmeldingen
-- Check Vercel function logs voor backend errors
+## Recent Changes (28 jan 2026)
 
-**Mogelijke oorzaken:**
-- e-Boekhouden API kan vereiste velden missen (relationId format, templateId, ledgerId)
-- Response parsing errors
+### Facturatie verbeteringen
+- Trainer/deelnemer filters verwijderd (vereenvoudigd)
+- Snelle periode knoppen (Vorige maand, Deze maand)
+- Batch versturen naar e-Boekhouden met progress indicator
+- Template ID en grootboek opgeslagen in localStorage
 
-### Facturatie Feature
-Functionaliteit voor het genereren van facturen per periode:
+### Instellingen pagina
+- Mobiel-vriendelijke layout
+- "Toon zondag" toggle (standaard uit)
+- Inklapbare help tekst
 
-**Database wijzigingen:**
-- `invoicedAt` veld toegevoegd aan Appointment model (tracks wanneer gefactureerd)
+### Kalender
+- Zondag verbergen in weekweergave (instelbaar)
+- Buttons volgorde aangepast: Verwijderen | Bewerken | Sluiten
 
-**API endpoints:**
-- `GET /api/invoices/billable?start=&end=&trainerId=&participantId=` - Haalt factureerbare afspraken op, gegroepeerd per deelnemer
-- `POST /api/invoices/generate` - Genereert facturen voor geselecteerde deelnemers
+### PWA
+- Manifest, service worker, icons toegevoegd
+- App installeerbaar op mobiel en desktop
 
-**Flow:**
-1. Selecteer periode (maand)
-2. Optioneel: filter op trainer/deelnemer
-3. Klik "Toon Resultaten"
-4. Bekijk factureerbare uren
-5. Klik "Facturen Genereren"
-6. Selecteer/deselecteer deelnemers
-7. Genereer facturen
-8. Verstuur naar e-Boekhouden
+## Known Limitations
 
-**Let op:** Alleen afspraken met status `COMPLETED` worden meegenomen.
-
-### Kalender verbeteringen
-- Time label alignment fix (was cumulative drift door -mt-2)
-- Recurring appointments tonen in toekomstige weken
-- `recurrenceEndDate` veld voor einddatum herhalende afspraken
-- Keuze bij bewerken herhalende afspraak: "Alleen deze" of "Hele reeks"
-
-### Appointment Modal verbeteringen
-- Edit functionaliteit toegevoegd
-- Compacte datum/tijd layout op mobiel
-- Reset van edit mode state bij sluiten modal
-
-## Taal
-De applicatie is in het **Nederlands**.
+- Google Calendar OAuth is nog niet geimplementeerd (iCal werkt wel)
+- CalendarConnection model bestaat maar OAuth flow is niet gebouwd
