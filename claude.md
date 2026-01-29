@@ -36,6 +36,24 @@ npm run db:studio     # Open Prisma Studio
 npm run db:seed       # Seed demo data
 ```
 
+### Local Development with Docker (optional)
+
+For full local stack (frontend + backend + database):
+```bash
+docker-compose up --build
+# Frontend: http://localhost:5173
+# Backend API: http://localhost:3001
+# Then run migrations: docker-compose exec backend npx prisma migrate dev
+```
+
+## Environment Variables
+
+Required in Vercel (production) or `.env` (local):
+- `DATABASE_URL` - Neon PostgreSQL connection string (pooled)
+- `DIRECT_URL` - Direct database URL (for Prisma migrations)
+- `JWT_SECRET` - JWT signing secret
+- `EBOEKHOUDEN_ACCESS_TOKEN` - e-Boekhouden API token
+
 ## Deployment
 
 - **Hosting:** Vercel (auto-deploys from GitHub on push)
@@ -69,13 +87,16 @@ npm run db:seed       # Seed demo data
 
 ### API Routes Pattern
 
-Routes use catch-all files like `[[...params]].ts`. The `vercel.json` contains rewrites for base routes.
+Routes use catch-all files like `[[...params]].ts`. The `vercel.json` rewrites base routes to `/_` (e.g., `/api/trainers` → `/api/trainers/_`).
 
 **CRITICAL - Catch-all param extraction:**
 ```typescript
 // Vercel passes params with brackets in the key
 const params = req.query['[...params]'] || req.query['[[...params]]'] || req.query['...params'];
 ```
+
+**CRITICAL - Helper function inlining:**
+Due to Vercel bundling issues, API files inline auth/prisma helpers instead of importing from `/lib`. When creating new API routes, copy the inline helpers pattern from existing files (see `api/appointments/[id].ts:6-36`).
 
 ### Vercel Function Limit
 
@@ -110,8 +131,6 @@ Key models:
 
 ## e-Boekhouden Integratie
 
-**Environment variable (Vercel):** `EBOEKHOUDEN_ACCESS_TOKEN`
-
 **API endpoints:**
 - `GET /api/eboekhouden/status` - Connectie status
 - `GET /api/eboekhouden/relations` - Relaties ophalen
@@ -135,28 +154,86 @@ Sommige instellingen worden lokaal opgeslagen:
 - `eboekhouden-template-id` - Laatst gebruikte factuursjabloon ID
 - `eboekhouden-ledger-id` - Laatst gebruikte grootboekrekening ID
 
-## Recent Changes (28 jan 2026)
-
-### Facturatie verbeteringen
-- Trainer/deelnemer filters verwijderd (vereenvoudigd)
-- Snelle periode knoppen (Vorige maand, Deze maand)
-- Batch versturen naar e-Boekhouden met progress indicator
-- Template ID en grootboek opgeslagen in localStorage
-
-### Instellingen pagina
-- Mobiel-vriendelijke layout
-- "Toon zondag" toggle (standaard uit)
-- Inklapbare help tekst
-
-### Kalender
-- Zondag verbergen in weekweergave (instelbaar)
-- Buttons volgorde aangepast: Verwijderen | Bewerken | Sluiten
-
-### PWA
-- Manifest, service worker, icons toegevoegd
-- App installeerbaar op mobiel en desktop
-
 ## Known Limitations
 
 - Google Calendar OAuth is nog niet geimplementeerd (iCal werkt wel)
 - CalendarConnection model bestaat maar OAuth flow is niet gebouwd
+
+---
+
+## Session Changes (30 jan 2026)
+
+### Nieuwe Features Geïmplementeerd
+
+#### 1. e-Boekhouden Relaties Importeren
+- **Import modal**: `src/components/ImportEboekhoudenModal.tsx`
+- Import knop op Deelnemers pagina
+- Matching logica: eerst op `eboekhoudenId`, dan op email
+- Statussen: "Gekoppeld", "Match gevonden", "Nieuw"
+
+#### 2. e-Boekhouden Token in Applicatie
+- Token configuratie in Instellingen pagina
+- Opslag in `Settings` model (database) met fallback naar env var
+- API endpoints: `PUT/DELETE /api/eboekhouden/token`
+
+#### 3. "Geen Factuur" per Deelnemer
+- `excludeFromInvoice` veld op Participant model
+- Toggle in ParticipantModal
+- Gefilterd in billable query
+
+#### 4. Kostenverdeling bij Afspraken
+- `isPayer` veld op AppointmentParticipant
+- UI in AppointmentModal bij 2+ deelnemers
+- Opties: "Gelijk verdelen" of "Eén betaler"
+
+#### 5. PWA Installatie
+- Automatische banner: `src/components/PWAInstallBanner.tsx`
+- Expliciete installatie sectie in Instellingen
+- Handmatige instructies voor iOS/Android/Desktop
+
+### Database Wijzigingen (Prisma)
+
+```prisma
+model Participant {
+  eboekhoudenId       Int?      @unique  // e-Boekhouden relatie ID
+  excludeFromInvoice  Boolean   @default(false)
+}
+
+model AppointmentParticipant {
+  isPayer             Boolean   @default(true)  // Kostenverdeling
+}
+
+model Settings {
+  id                  String    @id @default("global")
+  eboekhoudenToken    String?   // e-Boekhouden API token
+  updatedAt           DateTime  @updatedAt
+}
+```
+
+### Nieuwe/Gewijzigde Bestanden
+
+| Bestand | Wijziging |
+|---------|-----------|
+| `prisma/schema.prisma` | Participant, AppointmentParticipant, Settings model |
+| `api/participants/[[...params]].ts` | Import endpoint + schema update |
+| `api/eboekhouden/[[...params]].ts` | Token endpoints + Settings integratie |
+| `api/invoices/[[...params]].ts` | Billable filter (excludeFromInvoice, isPayer) |
+| `api/appointments/index.ts` | Kostenverdeling bij aanmaken |
+| `api/appointments/[id].ts` | Kostenverdeling bij bewerken |
+| `src/components/ImportEboekhoudenModal.tsx` | **Nieuw** - Import modal |
+| `src/components/PWAInstallBanner.tsx` | **Nieuw** - Install banner |
+| `src/components/AppointmentModal.tsx` | Kostenverdeling UI |
+| `src/components/ParticipantModal.tsx` | excludeFromInvoice toggle |
+| `src/pages/ParticipantsPage.tsx` | Import knop + badges |
+| `src/pages/SettingsPage.tsx` | Token config + PWA install sectie |
+| `src/pages/OverzichtPage.tsx` | eboekhoudenId badges + auto-select |
+| `src/lib/api.ts` | Nieuwe API calls + login 401 fix |
+
+### Bug Fixes
+
+- **Login error verdwijnt op mobiel**: 401 interceptor excluded nu `/auth/login` endpoint
+- **Demo user inactive**: `isActive` gereset na `prisma db push --accept-data-loss`
+
+### localStorage Keys (nieuw)
+
+- `pt-planner-pwa-dismissed` - PWA banner dismissal (7 dagen geldig)
