@@ -93,6 +93,10 @@ export const participantsApi = {
   delete: async (id: string) => {
     await api.delete(`/participants/${id}`);
   },
+  importFromEboekhouden: async (relations: { id: number; name: string; email?: string; phone?: string }[]) => {
+    const { data } = await api.post('/participants/import-eboekhouden', { relations });
+    return data;
+  },
 };
 
 // Training Types API
@@ -258,6 +262,14 @@ export const eboekhoudenApi = {
       templateId,
       ledgerId,
     });
+    return data;
+  },
+  saveToken: async (token: string) => {
+    const { data } = await api.put('/eboekhouden/token', { token });
+    return data;
+  },
+  deleteToken: async () => {
+    const { data } = await api.delete('/eboekhouden/token');
     return data;
   },
 };

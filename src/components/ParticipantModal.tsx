@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Link as LinkIcon } from 'lucide-react';
 import { participantsApi, trainingTypesApi } from '../lib/api';
 
 interface Participant {
@@ -10,6 +10,8 @@ interface Participant {
   phone?: string;
   notes?: string;
   preferredType?: string;
+  eboekhoudenId?: number | null;
+  excludeFromInvoice?: boolean;
 }
 
 interface ParticipantModalProps {
@@ -24,6 +26,7 @@ export default function ParticipantModal({ isOpen, onClose, editParticipant }: P
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [preferredType, setPreferredType] = useState('');
+  const [excludeFromInvoice, setExcludeFromInvoice] = useState(false);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -42,6 +45,7 @@ export default function ParticipantModal({ isOpen, onClose, editParticipant }: P
       setPhone(editParticipant.phone || '');
       setNotes(editParticipant.notes || '');
       setPreferredType(editParticipant.preferredType || '');
+      setExcludeFromInvoice(editParticipant.excludeFromInvoice || false);
     } else {
       resetForm();
     }
@@ -53,6 +57,7 @@ export default function ParticipantModal({ isOpen, onClose, editParticipant }: P
     setPhone('');
     setNotes('');
     setPreferredType('');
+    setExcludeFromInvoice(false);
     setError('');
   };
 
@@ -95,6 +100,7 @@ export default function ParticipantModal({ isOpen, onClose, editParticipant }: P
       phone: phone || undefined,
       notes: notes || undefined,
       preferredType: preferredType || undefined,
+      excludeFromInvoice,
     };
 
     if (editParticipant) {
@@ -117,9 +123,17 @@ export default function ParticipantModal({ isOpen, onClose, editParticipant }: P
       <div className="relative bg-white w-full lg:max-w-md lg:rounded-xl rounded-t-xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-lg font-semibold">
-            {editParticipant ? 'Bewerken' : 'Nieuwe deelnemer'}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">
+              {editParticipant ? 'Bewerken' : 'Nieuwe deelnemer'}
+            </h2>
+            {editParticipant?.eboekhoudenId && (
+              <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                <LinkIcon className="w-3 h-3" />
+                e-Boekhouden
+              </span>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="p-2 -mr-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
@@ -209,6 +223,25 @@ export default function ParticipantModal({ isOpen, onClose, editParticipant }: P
               placeholder="Bijzonderheden, blessures, doelen..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
             />
+          </div>
+
+          {/* Exclude from invoice */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="font-medium text-gray-900 text-sm">Geen factuur genereren</p>
+                <p className="text-xs text-gray-500">Deze deelnemer uitsluiten van facturatie</p>
+              </div>
+              <div className="relative inline-flex items-center flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={excludeFromInvoice}
+                  onChange={(e) => setExcludeFromInvoice(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
+              </div>
+            </label>
           </div>
         </form>
 

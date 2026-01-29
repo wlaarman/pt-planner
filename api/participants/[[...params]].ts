@@ -41,6 +41,17 @@ const participantSchema = z.object({
   phone: z.string().optional(),
   notes: z.string().optional(),
   preferredType: z.string().optional(),
+  eboekhoudenId: z.number().optional(),
+  excludeFromInvoice: z.boolean().optional(),
+});
+
+const importEboekhoudenSchema = z.object({
+  relations: z.array(z.object({
+    id: z.number(),
+    name: z.string(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+  })),
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -58,10 +69,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Vercel passes catch-all params with brackets in the key: '[...params]' or '[[...params]]'
     const params = req.query['[...params]'] || req.query['[[...params]]'] || req.query['...params'];
-    const rawId = Array.isArray(params) ? params[0] : params;
-    const id = rawId === '_' ? undefined : rawId; // '_' is rewrite placeholder for base route
+    const pathParts = Array.isArray(params) ? params : params ? [params] : [];
+    const rawFirstParam = pathParts[0];
+    const firstParam = rawFirstParam === '_' ? undefined : rawFirstParam; // '_' is rewrite placeholder for base route
+
+    // POST /participants/import-eboekhouden - Import relations from e-Boekhouden
+    if (firstParam === 'import-eboekhouden' && req.method === 'POST') {
+      const data = importEboekhoudenSchema.parse(req.body);
+
+      const results = {
+        created: 0,
+        linked: 0,
+        skipped: 0,
+        errors: [] as string[],
+      };
+
+      for (const relation of data.relations) {
+        try {
+          // Check if already linked by eboekhoudenId
+          const existingById = await prisma.participant.findUnique({
+            where: { eboekhoudenId: relation.id },
+          });
+
+          if (existingById) {
+            results.skipped++;
+            continue;
+          }
+
+          // Check if can link by email
+          if (relation.email) {
+            const existingByEmail = await prisma.participant.findUnique({
+              where: { email: relation.email },
+            });
+
+            if (existingByEmail) {
+              // Link existing participant
+              await prisma.participant.update({
+                where: { id: existingByEmail.id },
+                data: { eboekhoudenId: relation.id },
+              });
+              results.linked++;
+              continue;
+            }
+          }
+
+          // Create new participant
+          await prisma.participant.create({
+            data: {
+              name: relation.name,
+              email: relation.email || `eboekhouden-${relation.id}@placeholder.nl`,
+              phone: relation.phone,
+              eboekhoudenId: relation.id,
+            },
+          });
+          results.created++;
+        } catch (error) {
+          results.errors.push(`Failed to import ${relation.name}: ${error}`);
+        }
+      }
+
+      return res.status(200).json(results);
+    }
 
     // Routes without ID: GET all, POST create
+    const id = firstParam;
     if (!id) {
       if (req.method === 'GET') {
         const { search } = req.query;
@@ -84,6 +155,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             phone: true,
             notes: true,
             preferredType: true,
+            eboekhoudenId: true,
+            excludeFromInvoice: true,
             _count: {
               select: {
                 appointments: {

@@ -5,13 +5,14 @@ import {
   FileText,
   Palette,
   CheckCircle,
-  Clock,
   Link as LinkIcon,
   AlertCircle,
   ExternalLink,
+  Loader2,
+  Key,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { calendarApi } from '../lib/api';
+import { calendarApi, eboekhoudenApi } from '../lib/api';
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -26,6 +27,10 @@ export default function SettingsPage() {
     const stored = localStorage.getItem('pt-planner-show-sunday');
     return stored === null ? false : stored === 'true';
   });
+
+  // e-Boekhouden token settings
+  const [eboekhoudenToken, setEboekhoudenToken] = useState('');
+  const [tokenError, setTokenError] = useState('');
 
   // Fetch iCal settings
   const { data: icalSettings } = useQuery({
@@ -59,6 +64,48 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['ical-events'] });
     },
   });
+
+  // Fetch e-Boekhouden status
+  const { data: eboekhoudenStatus, isLoading: isLoadingEboekhoudenStatus } = useQuery({
+    queryKey: ['eboekhouden-status'],
+    queryFn: () => eboekhoudenApi.getStatus(),
+  });
+
+  // Mutation for saving e-Boekhouden token
+  const saveTokenMutation = useMutation({
+    mutationFn: (token: string) => eboekhoudenApi.saveToken(token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['eboekhouden-status'] });
+      setEboekhoudenToken('');
+      setTokenError('');
+    },
+    onError: (error: any) => {
+      setTokenError(error?.response?.data?.error || 'Ongeldige token');
+    },
+  });
+
+  // Mutation for deleting e-Boekhouden token
+  const deleteTokenMutation = useMutation({
+    mutationFn: () => eboekhoudenApi.deleteToken(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['eboekhouden-status'] });
+    },
+  });
+
+  const handleSaveToken = () => {
+    if (!eboekhoudenToken.trim()) {
+      setTokenError('Voer een token in');
+      return;
+    }
+    setTokenError('');
+    saveTokenMutation.mutate(eboekhoudenToken.trim());
+  };
+
+  const handleDeleteToken = () => {
+    if (confirm('Weet je zeker dat je de e-Boekhouden koppeling wilt verwijderen?')) {
+      deleteTokenMutation.mutate();
+    }
+  };
 
   const isConnected = !!icalSettings?.icalUrl;
 
@@ -288,17 +335,95 @@ export default function SettingsPage() {
             Boekhoudkoppeling
           </h2>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-gray-200 rounded-lg opacity-60">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600 flex-shrink-0">
-              <LinkIcon className="w-6 h-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-gray-900">e-Boekhouden</h3>
-              <p className="text-sm text-gray-500">Geconfigureerd via omgevingsvariabelen</p>
-              <span className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                <Clock className="w-3 h-3" />
-                Zie Overzicht pagina voor status
-              </span>
+          <div
+            className={clsx(
+              'p-4 border rounded-lg',
+              eboekhoudenStatus?.connected
+                ? 'border-green-200 bg-gradient-to-r from-green-50 to-transparent'
+                : 'border-gray-200'
+            )}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600 flex-shrink-0">
+                <LinkIcon className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-gray-900">e-Boekhouden</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Koppel je e-Boekhouden account om facturen te versturen
+                </p>
+
+                {isLoadingEboekhoudenStatus ? (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Status laden...
+                  </div>
+                ) : eboekhoudenStatus?.connected ? (
+                  <div className="mt-3">
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Verbonden
+                    </span>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Token bron: {eboekhoudenStatus?.debug?.tokenSource === 'settings' ? 'Instellingen' : 'Omgevingsvariabele'}
+                    </p>
+                  </div>
+                ) : eboekhoudenStatus?.tokenConfigured ? (
+                  <div className="mt-3">
+                    <span className="text-xs text-amber-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Token geconfigureerd maar verbinding mislukt
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Key className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="password"
+                        value={eboekhoudenToken}
+                        onChange={(e) => {
+                          setEboekhoudenToken(e.target.value);
+                          setTokenError('');
+                        }}
+                        placeholder="e-Boekhouden Access Token"
+                        className={clsx(
+                          'flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none',
+                          tokenError ? 'border-red-300' : 'border-gray-300'
+                        )}
+                      />
+                    </div>
+                    {tokenError && (
+                      <p className="text-xs text-red-500 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {tokenError}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Vind je token in e-Boekhouden: Beheer &gt; Koppelingen &gt; API
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex-shrink-0">
+                {eboekhoudenStatus?.connected || eboekhoudenStatus?.tokenConfigured ? (
+                  <button
+                    onClick={handleDeleteToken}
+                    disabled={deleteTokenMutation.isPending}
+                    className="w-full sm:w-auto px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    {deleteTokenMutation.isPending ? 'Bezig...' : 'Ontkoppelen'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSaveToken}
+                    disabled={saveTokenMutation.isPending || !eboekhoudenToken.trim()}
+                    className="w-full sm:w-auto px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                  >
+                    {saveTokenMutation.isPending ? 'Bezig...' : 'Verbinden'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </section>

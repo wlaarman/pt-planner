@@ -97,6 +97,9 @@ const appointmentSchema = z.object({
   isRecurring: z.boolean().default(false),
   recurrenceRule: z.string().optional(),
   recurrenceEndDate: z.string().datetime().optional(),
+  // Cost distribution: 'split' = divide among all, 'single' = one payer
+  costDistribution: z.enum(['split', 'single']).default('split'),
+  primaryPayerId: z.string().optional(), // Required when costDistribution is 'single'
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -126,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         participants: {
           include: {
             participant: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true, email: true, excludeFromInvoice: true },
             },
           },
         },
@@ -181,7 +184,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const transformed = appointments.map((apt) => ({
         ...apt,
-        participants: apt.participants.map((p) => p.participant),
+        participants: apt.participants.map((p) => ({
+          ...p.participant,
+          isPayer: p.isPayer,
+        })),
       }));
 
       return res.json(transformed);
@@ -228,6 +234,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // Determine payer status for each participant
+      const participantData = data.participantIds.map((participantId) => ({
+        participantId,
+        isPayer: data.costDistribution === 'single'
+          ? participantId === data.primaryPayerId
+          : true, // 'split' = all pay
+      }));
+
       const appointment = await prisma.appointment.create({
         data: {
           title: data.title,
@@ -240,9 +254,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           recurrenceRule: data.recurrenceRule,
           recurrenceEndDate: data.recurrenceEndDate ? new Date(data.recurrenceEndDate) : null,
           participants: {
-            create: data.participantIds.map((participantId) => ({
-              participantId,
-            })),
+            create: participantData,
           },
         },
         include: {
@@ -270,7 +282,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       return res.status(201).json({
         ...appointment,
-        participants: appointment.participants.map((p) => p.participant),
+        participants: appointment.participants.map((p) => ({
+          ...p.participant,
+          isPayer: p.isPayer,
+        })),
       });
     }
 

@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   ExternalLink,
+  Link as LinkIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
 import InvoiceGeneratorModal from '../components/InvoiceGeneratorModal';
@@ -29,7 +30,7 @@ interface Invoice {
   total: number;
   status: 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
   notes?: string;
-  participant: { id: string; name: string; email: string };
+  participant: { id: string; name: string; email: string; eboekhoudenId?: number | null };
 }
 
 interface BillableAppointment {
@@ -56,6 +57,8 @@ interface BillableParticipant {
   id: string;
   name: string;
   email: string;
+  eboekhoudenId?: number | null;
+  excludeFromInvoice?: boolean;
   appointments: BillableAppointment[];
   byTrainingType: TrainingTypeGroup[];
   totalMinutes: number;
@@ -502,7 +505,14 @@ export default function OverzichtPage() {
                               </span>
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium text-gray-900 truncate">{participant.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-gray-900 truncate">{participant.name}</p>
+                                {participant.eboekhoudenId && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700" title="Gekoppeld aan e-Boekhouden">
+                                    <LinkIcon className="w-3 h-3" />
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {participant.byTrainingType?.map((t) => (
                                   <span
@@ -673,6 +683,12 @@ export default function OverzichtPage() {
                             onClick={() => {
                               setSendError(null);
                               setSendToEboekhoudenModal(invoice);
+                              // Auto-select relation if participant has eboekhoudenId
+                              if (invoice.participant?.eboekhoudenId) {
+                                setSelectedRelationId(String(invoice.participant.eboekhoudenId));
+                              } else {
+                                setSelectedRelationId('');
+                              }
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
                           >

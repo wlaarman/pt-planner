@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { participantsApi } from '../lib/api';
-import { Plus, Search, Pencil, Trash2, BarChart3, Mail, Phone, Calendar } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, BarChart3, Mail, Phone, Calendar, Link as LinkIcon, Download, FileX } from 'lucide-react';
 import ParticipantModal from '../components/ParticipantModal';
+import ImportEboekhoudenModal from '../components/ImportEboekhoudenModal';
 import clsx from 'clsx';
 
 interface Participant {
@@ -12,12 +13,15 @@ interface Participant {
   phone?: string;
   notes?: string;
   preferredType?: string;
+  eboekhoudenId?: number | null;
+  excludeFromInvoice?: boolean;
   _count: { appointments: number };
 }
 
 export default function ParticipantsPage() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const queryClient = useQueryClient();
 
@@ -86,6 +90,14 @@ export default function ParticipantsPage() {
               className="w-full sm:w-48 lg:w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
             />
           </div>
+          {/* Import button */}
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-3 lg:px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex-shrink-0"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Import</span>
+          </button>
           {/* Add button */}
           <button
             onClick={() => {
@@ -127,16 +139,30 @@ export default function ParticipantsPage() {
                     <h3 className="font-semibold text-gray-900 truncate">
                       {participant.name}
                     </h3>
-                    {participant.preferredType && (
-                      <span
-                        className={clsx(
-                          'inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1',
-                          getTypeBadgeClass(participant.preferredType)
-                        )}
-                      >
-                        {participant.preferredType}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {participant.preferredType && (
+                        <span
+                          className={clsx(
+                            'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
+                            getTypeBadgeClass(participant.preferredType)
+                          )}
+                        >
+                          {participant.preferredType}
+                        </span>
+                      )}
+                      {participant.eboekhoudenId && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                          <LinkIcon className="w-3 h-3" />
+                          e-Boek
+                        </span>
+                      )}
+                      {participant.excludeFromInvoice && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+                          <FileX className="w-3 h-3" />
+                          Geen factuur
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -215,9 +241,21 @@ export default function ParticipantsPage() {
                         <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 text-sm font-medium">
                           {participant.name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium text-gray-900">
-                          {participant.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">
+                            {participant.name}
+                          </span>
+                          {participant.eboekhoudenId && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700" title="Gekoppeld aan e-Boekhouden">
+                              <LinkIcon className="w-3 h-3" />
+                            </span>
+                          )}
+                          {participant.excludeFromInvoice && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700" title="Uitgesloten van facturatie">
+                              <FileX className="w-3 h-3" />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-600">
@@ -277,6 +315,11 @@ export default function ParticipantsPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         editParticipant={editingParticipant}
+      />
+
+      <ImportEboekhoudenModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
       />
     </div>
   );

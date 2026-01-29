@@ -49,6 +49,12 @@ model Participant {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // e-Boekhouden integration
+  eboekhoudenId       Int?      @unique  // Relation ID from e-Boekhouden
+
+  // Invoice exclusion
+  excludeFromInvoice  Boolean   @default(false)
+
   // Relations
   appointments    AppointmentParticipant[]
   invoices        Invoice[]
@@ -131,6 +137,9 @@ model AppointmentParticipant {
   id              String    @id @default(cuid())
   appointmentId   String
   participantId   String
+
+  // Cost distribution: false = not billed for this appointment
+  isPayer         Boolean   @default(true)
 
   appointment     Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   participant     Participant  @relation(fields: [participantId], references: [id])
@@ -255,4 +264,13 @@ enum AuditAction {
   CREATE
   UPDATE
   DELETE
+}
+
+// Global application settings
+model Settings {
+  id                  String    @id @default("global")
+  eboekhoudenToken    String?   // e-Boekhouden API access token
+  updatedAt           DateTime  @updatedAt
+
+  @@map("settings")
 }

@@ -97,6 +97,9 @@ const appointmentSchema = z.object({
   isRecurring: z.boolean().default(false),
   recurrenceRule: z.string().optional(),
   recurrenceEndDate: z.string().datetime().optional().nullable(),
+  // Cost distribution: 'split' = divide among all, 'single' = one payer
+  costDistribution: z.enum(['split', 'single']).default('split'),
+  primaryPayerId: z.string().optional(), // Required when costDistribution is 'single'
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -141,7 +144,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       return res.json({
         ...appointment,
-        participants: appointment.participants.map((p) => p.participant),
+        participants: appointment.participants.map((p) => ({
+          ...p.participant,
+          isPayer: p.isPayer,
+        })),
       });
     }
 
@@ -208,10 +214,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       if (data.participantIds) {
+        // Determine payer status for each participant
+        const participantData = data.participantIds.map((participantId) => ({
+          participantId,
+          isPayer: data.costDistribution === 'single'
+            ? participantId === data.primaryPayerId
+            : true, // 'split' = all pay
+        }));
+
         updateData.participants = {
-          create: data.participantIds.map((participantId) => ({
-            participantId,
-          })),
+          create: participantData,
         };
       }
 
@@ -244,7 +256,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       return res.json({
         ...appointment,
-        participants: appointment.participants.map((p) => p.participant),
+        participants: appointment.participants.map((p) => ({
+          ...p.participant,
+          isPayer: p.isPayer,
+        })),
       });
     }
 

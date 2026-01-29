@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { X, User, Users, Loader2, Clock, Search } from 'lucide-react';
+import { X, User, Users, Loader2, Clock, Search, Euro } from 'lucide-react';
 import { appointmentsApi, trainersApi, participantsApi, trainingTypesApi } from '../lib/api';
 import clsx from 'clsx';
 
@@ -17,7 +17,7 @@ interface EditingAppointment {
   recurrenceId?: string; // Original appointment ID for recurring instances
   trainer: { id: string };
   trainingType: { id: string };
-  participants: { id: string }[];
+  participants: { id: string; isPayer?: boolean }[];
 }
 
 interface AppointmentModalProps {
@@ -56,6 +56,9 @@ export default function AppointmentModal({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState<'single' | 'series' | null>(null);
   const [showEditModeChoice, setShowEditModeChoice] = useState(false);
+  // Cost distribution
+  const [costDistribution, setCostDistribution] = useState<'split' | 'single'>('split');
+  const [primaryPayerId, setPrimaryPayerId] = useState<string>('');
 
   const { data: trainingTypes = [], isLoading: loadingTypes } = useQuery({
     queryKey: ['training-types'],
@@ -136,6 +139,16 @@ export default function AppointmentModal({
         setSelectedParticipants(editingAppointment.participants.map(p => p.id));
         setNotes(editingAppointment.notes || '');
 
+        // Load cost distribution from participant isPayer flags
+        const payers = editingAppointment.participants.filter(p => p.isPayer !== false);
+        if (payers.length === 1 && editingAppointment.participants.length > 1) {
+          setCostDistribution('single');
+          setPrimaryPayerId(payers[0].id);
+        } else {
+          setCostDistribution('split');
+          setPrimaryPayerId('');
+        }
+
         // For single instance edit, don't show recurrence options
         if (editMode === 'single') {
           setIsRecurring(false);
@@ -186,6 +199,8 @@ export default function AppointmentModal({
     setTouched({});
     setEditMode(null);
     setShowEditModeChoice(false);
+    setCostDistribution('split');
+    setPrimaryPayerId('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -214,6 +229,8 @@ export default function AppointmentModal({
       isRecurring,
       recurrenceRule: isRecurring ? recurrenceRule : undefined,
       recurrenceEndDate: isRecurring && recurrenceEndDate ? new Date(recurrenceEndDate).toISOString() : undefined,
+      costDistribution,
+      primaryPayerId: costDistribution === 'single' ? primaryPayerId : undefined,
     };
 
     if (editingAppointment) {
@@ -570,6 +587,72 @@ export default function AppointmentModal({
                   </select>
                 </div>
               </div>
+
+              {/* Cost Distribution - only show when multiple participants */}
+              {selectedParticipants.length > 1 && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Euro className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Kostenverdeling</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCostDistribution('split');
+                        setPrimaryPayerId('');
+                      }}
+                      className={clsx(
+                        'flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all text-center',
+                        costDistribution === 'split'
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <Users className="w-5 h-5 text-gray-600" />
+                      <span className="text-xs font-medium">Gelijk verdelen</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCostDistribution('single');
+                        if (selectedParticipants.length > 0 && !primaryPayerId) {
+                          setPrimaryPayerId(selectedParticipants[0]);
+                        }
+                      }}
+                      className={clsx(
+                        'flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all text-center',
+                        costDistribution === 'single'
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <User className="w-5 h-5 text-gray-600" />
+                      <span className="text-xs font-medium">Een betaler</span>
+                    </button>
+                  </div>
+                  {costDistribution === 'single' && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Wie betaalt?</label>
+                      <select
+                        value={primaryPayerId}
+                        onChange={(e) => setPrimaryPayerId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm bg-white"
+                      >
+                        <option value="">Selecteer betaler...</option>
+                        {selectedParticipants.map((id) => {
+                          const participant = participants.find((p: any) => p.id === id);
+                          return (
+                            <option key={id} value={id}>
+                              {participant?.name || id}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Recurrence */}
               <div className="bg-gray-50 rounded-lg p-3 space-y-3">

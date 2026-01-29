@@ -35,18 +35,37 @@ function setCorsHeaders(res: VercelResponse) {
 
 // e-Boekhouden API configuration
 const EBOEKHOUDEN_API_URL = 'https://api.e-boekhouden.nl';
-const EBOEKHOUDEN_ACCESS_TOKEN = process.env.EBOEKHOUDEN_ACCESS_TOKEN || '';
+
+// Get e-Boekhouden access token from Settings or env var
+async function getEboekhoudenToken(): Promise<string> {
+  try {
+    const settings = await prisma.settings.findUnique({
+      where: { id: 'global' },
+    });
+    if (settings?.eboekhoudenToken) {
+      return settings.eboekhoudenToken;
+    }
+  } catch {
+    // Settings table might not exist yet
+  }
+  return process.env.EBOEKHOUDEN_ACCESS_TOKEN || '';
+}
 
 // Create a session with e-Boekhouden
 async function createEboekhoudenSession(): Promise<string | null> {
   try {
+    const accessToken = await getEboekhoudenToken();
+    if (!accessToken) {
+      return null;
+    }
+
     const response = await fetch(`${EBOEKHOUDEN_API_URL}/v1/session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        accessToken: EBOEKHOUDEN_ACCESS_TOKEN,
+        accessToken,
         source: 'PTPLANNER', // max 10 chars
       }),
     });
@@ -325,14 +344,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // GET /eboekhouden/status - Check connection status
     if (firstParam === 'status' && req.method === 'GET') {
-      const tokenLength = EBOEKHOUDEN_ACCESS_TOKEN ? EBOEKHOUDEN_ACCESS_TOKEN.length : 0;
-      const tokenPreview = EBOEKHOUDEN_ACCESS_TOKEN ? EBOEKHOUDEN_ACCESS_TOKEN.substring(0, 5) + '...' : 'none';
+      const accessToken = await getEboekhoudenToken();
+      const tokenLength = accessToken ? accessToken.length : 0;
+      const tokenPreview = accessToken ? accessToken.substring(0, 5) + '...' : 'none';
+      const tokenSource = accessToken === process.env.EBOEKHOUDEN_ACCESS_TOKEN ? 'env' : 'settings';
 
-      if (!EBOEKHOUDEN_ACCESS_TOKEN) {
+      if (!accessToken) {
         return res.json({
           connected: false,
           error: 'API token not configured',
-          debug: { tokenLength, tokenPreview, envKeys: Object.keys(process.env).filter(k => k.includes('EBOEK')) }
+          tokenConfigured: false,
+          debug: { tokenLength, tokenPreview, tokenSource }
         });
       }
 
@@ -341,11 +363,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({
           connected: false,
           error: 'Could not connect to e-Boekhouden',
-          debug: { tokenLength, tokenPreview }
+          tokenConfigured: true,
+          debug: { tokenLength, tokenPreview, tokenSource }
         });
       }
 
-      return res.json({ connected: true, debug: { tokenLength, tokenPreview } });
+      return res.json({ connected: true, tokenConfigured: true, debug: { tokenLength, tokenPreview, tokenSource } });
+    }
+
+    // PUT /eboekhouden/token - Save API token to settings
+    if (firstParam === 'token' && req.method === 'PUT') {
+      const { token } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: 'Token is required' });
+      }
+
+      await prisma.settings.upsert({
+        where: { id: 'global' },
+        update: { eboekhoudenToken: token },
+        create: { id: 'global', eboekhoudenToken: token },
+      });
+
+      // Verify the token works
+      const sessionToken = await createEboekhoudenSession();
+      if (!sessionToken) {
+        return res.status(400).json({ error: 'Token is invalid or could not connect to e-Boekhouden' });
+      }
+
+      return res.json({ success: true });
+    }
+
+    // DELETE /eboekhouden/token - Remove API token from settings
+    if (firstParam === 'token' && req.method === 'DELETE') {
+      await prisma.settings.upsert({
+        where: { id: 'global' },
+        update: { eboekhoudenToken: null },
+        create: { id: 'global', eboekhoudenToken: null },
+      });
+
+      return res.json({ success: true });
     }
 
     // GET /eboekhouden/relations - Get relations from e-Boekhouden

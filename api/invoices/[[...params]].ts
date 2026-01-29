@@ -142,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           participants: {
             include: {
               participant: {
-                select: { id: true, name: true, email: true },
+                select: { id: true, name: true, email: true, excludeFromInvoice: true, eboekhoudenId: true },
               },
             },
           },
@@ -155,6 +155,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: string;
         name: string;
         email: string;
+        eboekhoudenId: number | null;
+        excludeFromInvoice: boolean;
         appointments: Array<{
           id: string;
           date: string;
@@ -182,7 +184,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ? Number(apt.trainingType.defaultRate)
             : 0;
 
-        const amount = (durationMinutes / 60) * hourlyRate;
+        // Count paying participants for cost distribution
+        const payingParticipants = apt.participants.filter(
+          (p) => p.isPayer && !p.participant.excludeFromInvoice
+        );
+        const payerCount = payingParticipants.length || 1;
+
+        // Amount per paying participant
+        const totalAmount = (durationMinutes / 60) * hourlyRate;
+        const amountPerPayer = totalAmount / payerCount;
 
         const aptData = {
           id: apt.id,
@@ -201,17 +211,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             defaultRate: apt.trainingType.defaultRate ? Number(apt.trainingType.defaultRate) : null,
           },
           rate: hourlyRate,
-          amount,
+          amount: amountPerPayer,
         };
 
-        // Add to each participant's list
+        // Add to each paying participant's list (skip excluded and non-payers)
         for (const p of apt.participants) {
           const participant = p.participant;
+
+          // Skip participants excluded from invoicing
+          if (participant.excludeFromInvoice) continue;
+
+          // Skip non-payers for this appointment
+          if (!p.isPayer) continue;
+
           if (!participantMap.has(participant.id)) {
             participantMap.set(participant.id, {
               id: participant.id,
               name: participant.name,
               email: participant.email,
+              eboekhoudenId: participant.eboekhoudenId,
+              excludeFromInvoice: participant.excludeFromInvoice,
               appointments: [],
               totalMinutes: 0,
               totalAmount: 0,
@@ -220,7 +239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const entry = participantMap.get(participant.id)!;
           entry.appointments.push(aptData);
           entry.totalMinutes += durationMinutes;
-          entry.totalAmount += amount;
+          entry.totalAmount += amountPerPayer;
         }
       }
 
@@ -323,7 +342,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const createdInvoices = [];
 
       for (const participantId of data.participantIds) {
-        // Get billable appointments for this participant
+        // Check if participant is excluded from invoicing
+        const participant = await prisma.participant.findUnique({
+          where: { id: participantId },
+          select: { excludeFromInvoice: true },
+        });
+
+        if (participant?.excludeFromInvoice) continue;
+
+        // Get billable appointments for this participant where they are a payer
         const appointments = await prisma.appointment.findMany({
           where: {
             status: { in: ['SCHEDULED', 'COMPLETED'] },
@@ -333,7 +360,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               lte: endDate,
             },
             participants: {
-              some: { participantId },
+              some: {
+                participantId,
+                isPayer: true,
+              },
             },
           },
           include: {
@@ -343,13 +373,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             trainingType: {
               select: { name: true, defaultRate: true },
             },
+            participants: {
+              where: { isPayer: true },
+              include: {
+                participant: {
+                  select: { excludeFromInvoice: true },
+                },
+              },
+            },
           },
           orderBy: { startTime: 'asc' },
         });
 
         if (appointments.length === 0) continue;
 
-        // Calculate amounts
+        // Calculate amounts with cost distribution
         const items = appointments.map((apt) => {
           const durationMinutes = Math.round(
             (new Date(apt.endTime).getTime() - new Date(apt.startTime).getTime()) / 60000
@@ -360,14 +398,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ? Number(apt.trainingType.defaultRate)
               : 0;
           const hours = durationMinutes / 60;
-          const amount = hours * hourlyRate;
+
+          // Calculate paying participants (exclude those excluded from invoicing)
+          const payingParticipants = apt.participants.filter(
+            (p) => !p.participant.excludeFromInvoice
+          );
+          const payerCount = payingParticipants.length || 1;
+
+          const totalAmount = hours * hourlyRate;
+          const amount = totalAmount / payerCount;
 
           const dateStr = apt.startTime.toISOString().split('T')[0];
           const description = `${apt.trainingType.name} - ${dateStr} (${hours.toFixed(1)}u)`;
 
           return {
             description,
-            quantity: hours,
+            quantity: hours / payerCount, // Split hours among payers
             unitPrice: hourlyRate,
             amount,
             appointmentId: apt.id,
@@ -488,7 +534,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where,
           include: {
             participant: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true, email: true, eboekhoudenId: true },
             },
             createdBy: {
               select: { id: true, name: true },
