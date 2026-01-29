@@ -10,6 +10,8 @@ import {
   ExternalLink,
   Loader2,
   Key,
+  Download,
+  Smartphone,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { calendarApi, eboekhoudenApi } from '../lib/api';
@@ -32,6 +34,10 @@ export default function SettingsPage() {
   const [eboekhoudenToken, setEboekhoudenToken] = useState('');
   const [tokenError, setTokenError] = useState('');
 
+  // PWA install
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
   // Fetch iCal settings
   const { data: icalSettings } = useQuery({
     queryKey: ['ical-settings'],
@@ -45,6 +51,32 @@ export default function SettingsPage() {
       setShowIcalEvents(icalSettings.showIcalEvents ?? true);
     }
   }, [icalSettings]);
+
+  // PWA install prompt
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Listen for successful install
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
 
   // Mutation for saving iCal settings
   const saveSettingsMutation = useMutation({
@@ -107,6 +139,21 @@ export default function SettingsPage() {
     }
   };
 
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) return;
+
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+      }
+      setDeferredPrompt(null);
+    } catch (error) {
+      console.error('PWA install error:', error);
+    }
+  };
+
   const isConnected = !!icalSettings?.icalUrl;
 
   const handleConnect = () => {
@@ -157,6 +204,77 @@ export default function SettingsPage() {
       </header>
 
       <div className="space-y-4 lg:space-y-6">
+        {/* PWA Install */}
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+            <Smartphone className="w-5 h-5 text-primary-500" />
+            App Installeren
+          </h2>
+
+          <div
+            className={clsx(
+              'p-4 border rounded-lg',
+              isInstalled
+                ? 'border-green-200 bg-gradient-to-r from-green-50 to-transparent'
+                : 'border-gray-200'
+            )}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 flex-shrink-0">
+                <Download className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-gray-900">PT Planner App</h3>
+                {isInstalled ? (
+                  <div className="mt-1">
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      App is geinstalleerd
+                    </span>
+                  </div>
+                ) : deferredPrompt ? (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Installeer de app op je apparaat voor snelle toegang
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Gebruik je browser menu om de app te installeren, of open deze pagina in Chrome/Safari
+                  </p>
+                )}
+              </div>
+              {!isInstalled && deferredPrompt && (
+                <button
+                  onClick={handleInstallPWA}
+                  className="w-full sm:w-auto px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Installeren
+                </button>
+              )}
+            </div>
+
+            {!isInstalled && !deferredPrompt && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-2">Handmatig installeren:</p>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li className="flex items-start gap-2">
+                    <span className="font-medium text-gray-500 w-16 flex-shrink-0">iPhone:</span>
+                    <span>Tik op <span className="inline-flex items-center px-1.5 py-0.5 bg-gray-100 rounded text-xs">Deel</span> → "Zet op beginscherm"</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-medium text-gray-500 w-16 flex-shrink-0">Android:</span>
+                    <span>Tik op <span className="inline-flex items-center px-1.5 py-0.5 bg-gray-100 rounded text-xs">⋮</span> → "Toevoegen aan startscherm"</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-medium text-gray-500 w-16 flex-shrink-0">Desktop:</span>
+                    <span>Klik op het installatie-icoon in de adresbalk</span>
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Calendar Display Settings */}
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
